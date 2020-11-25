@@ -1,0 +1,14 @@
+# Python
+*.pyc
+.ipynb_checkpoints
+
+# Files
+borrowed_data
+mode_data
+roman_data
+symbol_data
+sec_data
+tempos
+downbeats
+*.npy
+model_gibbs_96_weight.pth

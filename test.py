@@ -62,7 +62,7 @@ class multitask_model(nn.Module):
         self.drop1 = nn.Dropout(p=0.2)
 
     def forward(self, x, length, x2, mask):
-        x = torch.cat((x, x2, mask), dim=-1)
+        x = torch.cat((x.float(), x2.float(), mask.float()), dim=-1)
         packed_x = pack_padded_sequence(x, length, batch_first=True, enforce_sorted=False)
         packed_x, (ht, ct) = self.bilstm(packed_x)
         lstmout, _ = pad_packed_sequence(packed_x, batch_first=True, total_length=272)
@@ -80,6 +80,8 @@ model.load_state_dict(torch.load('./model_gibbs_96_weight.pth'))
 
 model.eval()
 melody, length = val_melody.to(device), val_length.to(device)
+
+# Chord sampling
 print('gibbs sampling...')
 with torch.no_grad():
     chord_onehot = torch.zeros(val_size, 272, 96).to(device)
@@ -91,9 +93,9 @@ with torch.no_grad():
     for i in range(n):
         alpha = p_min + ((p_max - p_min) / n) * i
         if i < n - 1:
-            print('simpling the ', i + 1, 'th round, alpha=', alpha, end='\r')
+            print('sampling the ', i + 1, 'th round, alpha=', alpha, end='\r')
         else:
-            print('simpling the ', i + 1, 'th round, alpha=', alpha)
+            print('sampling the ', i + 1, 'th round, alpha=', alpha)
         chord_mask, bin_chord_mask = random_choice(batch_size=val_size, p=alpha)
         chord_mask, bin_chord_mask = torch.from_numpy(chord_mask).to(device), torch.from_numpy(bin_chord_mask).to(device)
         chord_pred = torch.reshape(chord_pred, (val_size * 272, -1))
@@ -101,11 +103,13 @@ with torch.no_grad():
         chord_pred = torch.reshape(chord_pred, (val_size, 272, -1))
 
         mask = torch.reshape(bin_chord_mask, (val_size, 272, 1))
-
+        
+        # Update chord pred per iteration
         chord_pred_new = model(melody, length, chord_pred, mask)
 
         bin_chord_mask = torch.reshape(bin_chord_mask, (val_size, 272)).unsqueeze(2)
-
+        
+        # Update prediction only if chord is blocked
         chord_pred = torch.where(bin_chord_mask == 1, chord_pred_new, chord_pred)
 
 # proceed chord decode

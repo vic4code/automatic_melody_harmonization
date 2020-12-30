@@ -138,6 +138,7 @@ for i in range(val_size):
     m[5] += mctd
     f.write(str(che) + " " + str(cc) + " " + str(ctd) + " " + str(ctnctr) + " " + str(pcs) + " " + str(mctd) + '\n')
 f.close()
+
 print('CHE: ', m[0]/val_size)
 print('CC: ', m[1]/val_size)
 print('CTD: ', m[2]/val_size)

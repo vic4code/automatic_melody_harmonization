@@ -131,7 +131,7 @@ for epoch in range(epochs):
         chord_mask, bin_chord_mask = random_choice()
         chord_mask, bin_chord_mask = torch.from_numpy(chord_mask).to(device), torch.from_numpy(bin_chord_mask).to(device)
         
-        # chord_onehot (512 (batch), 272, 96) -> (batch_size * 272, 1)
+        # chord_onehot (512 (batch), 272, 96) -> (batch_size * 272, 1) for masking
         chord_onehot = torch.reshape(chord_onehot, (batch_size * 272, -1))
         
         # mask(add 96 blanks) chord by index
@@ -171,8 +171,11 @@ for epoch in range(epochs):
         # Cut the none target index (reserve masked part to calculate loss)
         chord_pred_flatten_part = chord_pred_flatten[bin_chord_mask_flatten.nonzero(as_tuple=True)[0], :]
         chord_flatten_part = chord_flatten[bin_chord_mask_flatten.nonzero(as_tuple=True)[0], :]
-
+        
         chord_flatten_part = chord_flatten_part.squeeze().long()
+        print(chord_pred_flatten_part.shape)
+        print(chord_flatten_part.shape)
+        
         ce1 = loss_crossentropy1(chord_pred_flatten_part, chord_flatten_part)
         chord_loss += ce1.item()
         ce1.backward()

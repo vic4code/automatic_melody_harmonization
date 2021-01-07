@@ -16,6 +16,11 @@ chord_groundtruth = []
 symbol_data = []
 length = []
 tempos = []
+
+# SIA pattern ratio
+r_pitch = []
+r_rhythm = []
+
 # First beat?
 downbeats = []
 roman_data = []

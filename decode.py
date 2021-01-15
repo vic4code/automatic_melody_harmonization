@@ -75,3 +75,32 @@ def write_pianoroll(result_dir, melody_data, accompany_pianoroll_frame,chord_gro
         counter += 1
     
     print('Finished!')
+    
+
+# write one pianoroll at once
+def write_one_pianoroll(result_dir, filename, melody_data, accompany_pianoroll_frame,chord_groundtruth_frame, length, tempos,downbeats, beat_resolution=24, beat_per_chord=2):
+
+    print('write pianoroll...')
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir)
+
+        melody_roll, chord_roll, truth_roll = melody_data[:l], accompany_pianoroll_frame[:l], chord_groundtruth_frame[:l]
+
+        track1 = Track(pianoroll=melody_roll)
+        track2 = Track(pianoroll=chord_roll)
+        track3 = Track(pianoroll=truth_roll)
+
+        generate = Multitrack(tracks=[track1, track2], tempo=tempo, downbeat=downbeat, beat_resolution=beat_resolution)
+        truth = Multitrack(tracks=[track1, track3], tempo=tempo, downbeat=downbeat, beat_resolution=beat_resolution)
+
+        pr.write(generate, result_dir + '/' + filename + '.mid')
+        pr.write(truth, result_dir + '/' + filename + '.mid')
+
+        fig, axs = generate.plot()
+        plt.savefig(result_dir + '/' + filename + '.png')
+        plt.close()
+        fig, axs = truth.plot()
+        plt.savefig(result_dir + '/' + filename + '.png')
+        plt.close()
+    
+    print('Finished!')

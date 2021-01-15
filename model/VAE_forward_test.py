@@ -16,37 +16,45 @@ from model.VAE import *
 step = 1
 batch_size = 5
 
+device = 'cpu'
+
 # Annealing parameter
 k = 0.0025
 x0 = 2500
 
+loss_function = torch.nn.NLLLoss(reduction='sum')
+
 model = VAE().to(device)
 
-input_chord = torch.randn(batch_size, 272, 96)
+chord_onehot = torch.randn(batch_size, 272, 96)
 length = torch.Tensor([272, 100, 200, 150, 120]).long()
-chord_pred, mu, log_var, input_x = model(input_chord,length)
+
+chord_pred, logp, mu, log_var, input_x = model(chord_onehot,length)
 
 # flatten tensor to calculate loss
 # chord = torch.empty(batch_size, 272, 96 + 1, dtype=torch.long).random_(0, 1)
 
-chord_pred_flatten = []
+# Arrange 
+chord_flatten = []
+logp_flatten = []
 length = length.squeeze()
 
 for i in range(batch_size):
     # Get predicted softmax chords by length of the song (cutting off padding 0), (1,length,96)
-    chord_pred_flatten.append(chord_pred[i][:length[i]])
+    logp_flatten.append(logp[i][:length[i]])
 
     # Get groundtruth chords by length of the song (cutting off padding 0), (1,length)
-    # chord_flatten.append(chord[i][:length[i]])
+    chord_flatten.append(chord_onehot[i][:length[i]])
 
 # Rearrange for loss calculation
-chord_pred_flatten = torch.cat(chord_pred_flatten, dim=0)
-chord_groundtruth_index = torch.empty(chord_pred_flatten.shape[0], dtype=torch.long).random_(0, 96)
+logp_flatten = torch.cat(logp_flatten, dim=0)
+chord_flatten = torch.cat(chord_flatten,dim=0)
+chord_groundtruth_index = torch.max(chord_flatten,1).indices
 
 # loss calculation
 # Add weight to NLL also
-
-NLL_loss, KL_loss, KL_weight = loss_fn(logp = chord_pred_flatten, target = chord_groundtruth_index, length = length, mean = mu, log_var = log_var,anneal_function='logistic', step=step, k=k, x0=x0)
+NLL_loss, KL_loss, KL_weight = loss_fn(loss_function = loss_function, logp = logp_flatten, target = chord_groundtruth_index, length = length, mean = mu, log_var = log_var,anneal_function='logistic', step=step, k=k, x0=x0)
+# NLL_loss, KL_loss, KL_weight = loss_fn(logp = chord_pred_flatten, target = chord_groundtruth_index, length = length, mean = mu, log_var = log_var,anneal_function='logistic', step=step, k=k, x0=x0)
 
 loss = (NLL_loss + KL_weight * KL_loss) / batch_size
 print('loss: ',loss.item())

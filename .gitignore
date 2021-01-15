@@ -12,3 +12,8 @@ tempos
 downbeats
 *.npy
 model_gibbs_96_weight.pth
+
+# Folders
+results/
+output_models/
+

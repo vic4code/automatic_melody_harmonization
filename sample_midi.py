@@ -22,9 +22,9 @@ def main():
     parser.add_argument(
         '--device', default='cpu', help='device')
     parser.add_argument(
-        '--modeldir', required=True, default = 'model_parameter_cvae_weighting.pth', type=str, help='model directory')
+        '--modeldir',  default = 'model_parameter_cvae_weighting.pth', type=str, help='model directory')
     parser.add_argument(
-        '--outputdir', required=True, default = 'parameter_cvae_sample_result', type=str, help='output directory')
+        '--outputdir',  default = 'parameter_cvae_sample_result', type=str, help='output directory')
     parser.add_argument(
         '--seed', default=30, type=str, help='random seed')
     parser.add_argument(
@@ -75,12 +75,15 @@ def main():
     model.load_state_dict(torch.load('output_models/' + args.modeldir))
 
     model.eval()
-    chord, length = val_chord.to(device), val_length.to(device)
+    val_length = val_length.to(device)
 
     # sample conditions
     latent_size = 16
     pianoroll_frames = 12 * 24 * 2
-    indices = np.random.randint(500, size=10)
+    
+    np.random.seed(args.seed)
+    indices = np.random.randint(500, size=args.sample_num)
+    print(indices)
     
     for index in indices:
         melody_truth = np.expand_dims(melody_data[index], axis=0)
@@ -89,15 +92,16 @@ def main():
         downbeat = [downbeats[index]]
 
         melody1 = val_melody[index].unsqueeze(dim=0)
-        length1 = torch.Tensor([length[index]]).long()
+        print(val_length.shape)
+        inference_length = torch.Tensor([val_length[index]]).long()
 
         # Sampling
         seed = args.seed
         torch.manual_seed(seed)
 
         batch_size = 1
-        r_pitch = torch.Tensor([args.pitch_ratio])
-        r_rhythm = torch.Tensor([args.rhythm_ratio])
+        r_pitch = torch.Tensor([float(args.pitch_ratio)])
+        r_rhythm = torch.Tensor([float(args.rhythm_ratio)])
 
         r_pitch = r_pitch.view(batch_size,1,1).expand(batch_size,272,1).to(device)
         r_rhythm = r_rhythm.view(batch_size,1,1).expand(batch_size,272,1).to(device)
@@ -106,12 +110,12 @@ def main():
 
         z = torch.cat((latent,melody1,r_pitch,r_rhythm), dim=-1)
 
-        _, chord_pred = model.decode(z,length1)
+        _, chord_pred = model.decode(z,inference_length)
 
         ########## Random sampling ###########
         # Proceed chord decode
         print('proceed chord decode...')
-        length = length1
+        decode_length = inference_length
         joint_prob = chord_pred.cpu().detach().numpy()
 
         # Append argmax index to get pianoroll array
@@ -124,12 +128,14 @@ def main():
         accompany_pianoroll_frame, chord_groundtruth_frame = sequence2frame(accompany_pianoroll, chord_truth, beat_resolution=beat_resolution, beat_per_chord=beat_per_chord)
 
         # length into frame base
-        length = length * beat_resolution * beat_per_chord
+        decode_length = decode_length * beat_resolution * beat_per_chord
 
         # write pianoroll
         result_dir = 'results/' + args.outputdir
-        filename = index + '-pitch-' + str(r_pitch) + '-rhythm-' + str(r_rhythm)
-        write_one_pianoroll(result_dir, filename ,melody_truth, accompany_pianoroll_frame,chord_groundtruth_frame, length, tempo,downbeat)
+        filename = str(index) + '-pitch-' + str(args.pitch_ratio) + '-rhythm-' + str(args.rhythm_ratio)
+        print(result_dir)
+        print(result_dir + '/' + filename + '.mid')
+        write_one_pianoroll(result_dir, filename ,melody_truth, accompany_pianoroll_frame,chord_groundtruth_frame, decode_length, tempo,downbeat)
     
 if __name__ == "__main__":
     main()

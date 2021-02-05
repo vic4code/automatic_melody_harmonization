@@ -22,9 +22,9 @@ def main():
     parser.add_argument(
         '--device', default='cpu', help='device')
     parser.add_argument(
-        '--modeldir',  default = 'model_parameter_cvae_weighting.pth', type=str, help='model directory')
+        '--modeldir',  default = 'model_pitch_pattern_cvae_weighting.pth', type=str, help='model directory')
     parser.add_argument(
-        '--outputdir',  default = 'parameter_cvae_sample_result', type=str, help='output directory')
+        '--outputdir',  default = 'pitch_pattern_cvae_sample_result', type=str, help='output directory')
     parser.add_argument(
         '--seed', default=30, type=str, help='random seed')
     parser.add_argument(
@@ -68,7 +68,6 @@ def main():
     tempos = tempos[:val_size]
     downbeats = downbeats[:val_size]
 
-
     # Load model
     print('building model...')
     model = CVAE(device = device).to(device)
@@ -101,14 +100,15 @@ def main():
 
         batch_size = 1
         r_pitch = torch.Tensor([float(args.pitch_ratio)])
-        r_rhythm = torch.Tensor([float(args.rhythm_ratio)])
+#         r_rhythm = torch.Tensor([float(args.rhythm_ratio)])
 
         r_pitch = r_pitch.view(batch_size,1,1).expand(batch_size,272,1).to(device)
-        r_rhythm = r_rhythm.view(batch_size,1,1).expand(batch_size,272,1).to(device)
+#         r_rhythm = r_rhythm.view(batch_size,1,1).expand(batch_size,272,1).to(device)
 
         latent = torch.rand(1,272,latent_size)
 
-        z = torch.cat((latent,melody1,r_pitch,r_rhythm), dim=-1)
+#         z = torch.cat((latent,melody1,r_pitch,r_rhythm), dim=-1)
+        z = torch.cat((latent,melody1,r_pitch), dim=-1)
 
         _, chord_pred = model.decode(z,inference_length)
 
@@ -132,7 +132,8 @@ def main():
 
         # write pianoroll
         result_dir = 'results/' + args.outputdir
-        filename = str(index) + '-pitch-' + str(args.pitch_ratio) + '-rhythm-' + str(args.rhythm_ratio)
+#         filename = str(index) + '-pitch-' + str(args.pitch_ratio) + '-rhythm-' + str(args.rhythm_ratio)
+        filename = str(index) + '-pitch-' + str(args.pitch_ratio)
         print(result_dir)
         print(result_dir + '/' + filename + '.mid')
         write_one_pianoroll(result_dir, filename ,melody_truth, accompany_pianoroll_frame,chord_groundtruth_frame, decode_length, tempo,downbeat)

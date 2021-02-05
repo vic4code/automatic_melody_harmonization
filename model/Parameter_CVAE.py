@@ -5,6 +5,7 @@ from torch.nn import functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.autograd import Variable
 
+
 class CVAE(nn.Module):
     def __init__(self, lstm_dim = 96, fc_dim = 128, chord_size = 96, latent_size = 16,device = 'cpu'):
         super(CVAE, self).__init__()
@@ -20,7 +21,7 @@ class CVAE(nn.Module):
         self.hidden2logv = nn.Linear(fc_dim, latent_size)
         
         # Latent to decoder
-        self.latent2hidden = nn.Linear(latent_size + 12 * 24 * 2 + 1 + 1, fc_dim)
+        self.latent2hidden = nn.Linear(latent_size + 12 * 24 * 2 + 1, fc_dim)
         
         # Decoder
         self.decoder = nn.LSTM(input_size = fc_dim, hidden_size = fc_dim // 2, num_layers = 2, batch_first = True, dropout=0.2, bidirectional=True)
@@ -82,7 +83,7 @@ class CVAE(nn.Module):
         
         return result, softmax
     
-    def forward(self, input_x, melody, length, r_pitch, r_rhythm):
+    def forward(self, input_x, melody, length, r_pitch):
         
         # Note
         # 拿 hidden out output , 再把
@@ -96,7 +97,8 @@ class CVAE(nn.Module):
 #         print(z.shape)
         
         # Add condition 
-        z = torch.cat((z, melody, r_pitch, r_rhythm), dim=-1)
+#         z = torch.cat((z, melody, r_pitch, r_rhythm), dim=-1)
+        z = torch.cat((z, melody, r_pitch), dim=-1)
         
         # Decode
         output,softmax = self.decode(z, length)

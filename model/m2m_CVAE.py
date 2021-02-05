@@ -6,7 +6,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.autograd import Variable
 
 class CVAE(nn.Module):
-    def __init__(self, lstm_dim = 96, fc_dim = 128, chord_size = 96, latent_size = 16,device = 'cpu'):
+    def __init__(self, lstm_dim = 12 * 24 * 2 , fc_dim = 128, output_size = 12 * 24 * 2, latent_size = 16,device = 'cpu'):
         super(CVAE, self).__init__()
         
         self.device = device
@@ -20,13 +20,13 @@ class CVAE(nn.Module):
         self.hidden2logv = nn.Linear(fc_dim, latent_size)
         
         # Latent to decoder
-        self.latent2hidden = nn.Linear(latent_size + 12 * 24 * 2, fc_dim)
+        self.latent2hidden = nn.Linear(latent_size + 96, fc_dim)
         
         # Decoder
         self.decoder = nn.LSTM(input_size = fc_dim, hidden_size = fc_dim // 2, num_layers = 2, batch_first = True, dropout=0.2, bidirectional=True)
         
         # Decoder to reconstructed chords
-        self.outputs2chord = nn.Linear(fc_dim, chord_size)
+        self.outputs2chord = nn.Linear(fc_dim, output_size)
         
         
     def encode(self, input,length):
@@ -82,20 +82,20 @@ class CVAE(nn.Module):
         
         return result, softmax
     
-    def forward(self, input_x, melody, length):
+    def forward(self, chord, melody, length):
         
         # Note
         # 拿 hidden out output , 再把
         # z - > 改丟到 hidden 
         
         # Encode
-        mu, log_var = self.encode(input_x,length)
+        mu, log_var = self.encode(melody,length)
         
         # Reparameterize
         z = self.reparameterize(mu, log_var)
         
-        # Add condition 
-        z = torch.cat((z,melody), dim=-1)
+        # Add chord condition 
+        z = torch.cat((z,chord), dim=-1)
         
         # Decode
         output,softmax = self.decode(z, length)
@@ -103,7 +103,7 @@ class CVAE(nn.Module):
         # Log Softmax
         logp = F.log_softmax(output, dim=-1)
     
-        return softmax,logp, mu, log_var, input_x
+        return softmax, logp, mu, log_var, chord
     
     def sample(self, length):
         
@@ -114,5 +114,7 @@ class CVAE(nn.Module):
         sample = self.decode(latent_sample,length)
         
         return F.softmax(sample,dim=-1)
+    
+    
     
  

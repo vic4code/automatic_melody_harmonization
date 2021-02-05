@@ -124,6 +124,7 @@ for epoch in range(epochs):
         # chord (512, 272, 128)
         # length (512,1)
         # chord_onehot (512, 272, 96)
+        
         melody, chord, length, chord_onehot = melody.to(device), chord.to(device), length.to(device), chord_onehot.to(device)
         optimizer.zero_grad()
 

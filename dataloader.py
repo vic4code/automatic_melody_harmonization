@@ -24,7 +24,7 @@ class ChordGenerDataset(Dataset):
     
 # Parameterized Dataset
 class Parameterized_Dataset(Dataset):
-    def __init__(self, melody, chord, length, chord_onehot, pitch_pattern_ratio, pitch_pattern_rhythm):
+    def __init__(self, melody, chord, length, chord_onehot, pitch_pattern_ratio):
 #         super().__init__(melody, chord, length, chord_onehot, pitch_pattern_ratio, pitch_pattern_rhythm)
         self.melody = melody
         self.chord = chord
@@ -33,7 +33,7 @@ class Parameterized_Dataset(Dataset):
         self.chord_onehot = chord_onehot
         # (batch,1) -> (batch,1,1)
         self.pitch_pattern_ratio = np.expand_dims(pitch_pattern_ratio, axis=1)
-        self.pitch_pattern_rhythm = np.expand_dims(pitch_pattern_rhythm, axis=1)
+#         self.pitch_pattern_rhythm = np.expand_dims(pitch_pattern_rhythm, axis=1)
 
     def __getitem__(self, index):
         x = torch.from_numpy(self.melody[index]).float()
@@ -41,9 +41,9 @@ class Parameterized_Dataset(Dataset):
         l = torch.from_numpy(self.length[index])
         x2 = torch.from_numpy(self.chord_onehot[index]).float()
         r_pitch = torch.from_numpy(self.pitch_pattern_ratio[index]).float()
-        r_rhythm = torch.from_numpy(self.pitch_pattern_rhythm[index]).float()
+#         r_rhythm = torch.from_numpy(self.pitch_pattern_rhythm[index]).float()
         
-        return x, y, l, x2, r_pitch, r_rhythm
+        return x, y, l, x2, r_pitch
 
     def __len__(self):
         return (self.melody.shape[0])

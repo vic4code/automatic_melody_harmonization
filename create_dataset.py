@@ -9,7 +9,7 @@ import math
 # Beat unit frame size
 beat_resolution = 24
 # 
-beat_per_chord = 2
+beat_per_chord = 1
 
 melody_data = []
 chord_groundtruth = []
@@ -176,41 +176,41 @@ print(chord_groundtruth.shape)
 print(length.shape)
 
 # Save np arrays 
-np.save('melody_data', melody_data)
-np.save('chord_groundtruth', chord_groundtruth)
-np.save('length', length)
+np.save('melody_data_' + str(beat_per_chord) + '_beat', melody_data)
+np.save('chord_groundtruth_' + str(beat_per_chord) + '_beat' , chord_groundtruth)
+np.save('length_' + str(beat_per_chord) + '_beat', length)
 
 # Save as pickle files
-f = open('tempos', 'wb')
+f = open('tempos_' + str(beat_per_chord) + '_beat', 'wb')
 pickle.dump(tempos, f)
 f.close()
-f = open('downbeats', 'wb')
+f = open('downbeats_' + str(beat_per_chord) + '_beat', 'wb')
 pickle.dump(downbeats, f)
 f.close()
 
 print('max event off:', max_event_off)
 print('len of symbol data:', len(symbol_data))
-f = open('symbol_data', 'wb')
+f = open('symbol_data_' + str(beat_per_chord) + '_beat' , 'wb')
 pickle.dump(symbol_data, f)
 f.close()
 
-print('len of roman data:', len(roman_data))
-f = open('roman_data', 'wb')
+print('len of roman data:' , len(roman_data))
+f = open('roman_data_' + str(beat_per_chord) + '_beat' , 'wb')
 pickle.dump(roman_data, f)
 f.close()
 
 print('len of sec data:', len(sec_data))
-f = open('sec_data', 'wb')
+f = open('sec_data_' + str(beat_per_chord) + '_beat', 'wb')
 pickle.dump(sec_data, f)
 f.close()
 
 print('len of borrowed data:', len(borrowed_data))
-f = open('borrowed_data', 'wb')
+f = open('borrowed_data_'+ str(beat_per_chord) + '_beat', 'wb')
 pickle.dump(borrowed_data, f)
 f.close()
 
 print('len of mode data:', len(mode_data))
-f = open('mode_data', 'wb')
+f = open('mode_data_'+ str(beat_per_chord) + '_beat', 'wb')
 pickle.dump(mode_data, f)
 f.close()
 

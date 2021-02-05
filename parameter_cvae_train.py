@@ -11,7 +11,7 @@ from model.Parameter_CVAE import *
 
 batch_size = 512
 epochs = 10
-device = torch.device('cuda:3')
+device = torch.device('cuda:0')
 # validation data size
 val_size = 500
 
@@ -23,7 +23,7 @@ chord_onehot = np.load('./onehot_96.npy')
 length = np.load('./length.npy')
 weight_chord = np.load('./weight_chord.npy')
 r_pitch = np.load('./pitch_pattern_ratio.npy')
-r_rhythm = np.load('./rhythm_pattern_ratio.npy')
+# r_rhythm = np.load('./rhythm_pattern_ratio.npy')
 
 #Splitting data
 print('splitting validation set...')
@@ -39,14 +39,14 @@ weight_chord = torch.from_numpy(weight_chord).float().to(device)
 
 train_r_pitch = r_pitch[val_size:]
 val_r_pitch = torch.from_numpy(r_pitch[:val_size]).float()
-train_r_rhythm = r_rhythm[val_size:]
-val_r_rhythm = torch.from_numpy(r_rhythm[:val_size]).float()
+# train_r_rhythm = r_rhythm[val_size:]
+# val_r_rhythm = torch.from_numpy(r_rhythm[:val_size]).float()
 
 max_chord_sequence = chord.shape[1] # 272
 
 # Create dataloader
 print('creating dataloader...')
-dataset = Parameterized_Dataset(train_melody, train_chord, train_length, train_chord_onehot, train_r_pitch, train_r_rhythm)
+dataset = Parameterized_Dataset(train_melody, train_chord, train_length, train_chord_onehot, train_r_pitch)
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=16, drop_last=True)
 
 # Model
@@ -73,20 +73,20 @@ for epoch in range(epochs):
     ########## Training mode ###########
     model.train()
     chord_loss = 0
-    for melody, chord, length, chord_onehot, r_pitch, r_rhythm in dataloader:
+    for melody, chord, length, chord_onehot, r_pitch in dataloader:
         
         # melody (512, 272, 12 * 24 * 2)
         # chord (512, 272, 128)
         # length (512,1)
         # chord_onehot (512, 272, 96)
         
-        melody, chord, length, chord_onehot, r_pitch, r_rhythm = melody.to(device), chord.to(device), length.to(device).squeeze(), chord_onehot.to(device), r_pitch.view(batch_size,1,1).expand(batch_size,272,1).to(device), r_rhythm.view(batch_size,1,1).expand(batch_size,272,1).to(device)
+        melody, chord, length, chord_onehot, r_pitch = melody.to(device), chord.to(device), length.to(device).squeeze(), chord_onehot.to(device), r_pitch.view(batch_size,1,1).expand(batch_size,272,1).to(device), 
         optimizer.zero_grad()
     
         # Model prediction
 #         print(chord_onehot.shape)
 #         print(length.shape)
-        chord_pred,logp ,mu, log_var, input_x = model(chord_onehot,melody,length,r_pitch,r_rhythm)
+        chord_pred,logp ,mu, log_var, input_x = model(chord_onehot,melody,length,r_pitch)
         
         # Arrange 
         chord_pred_flatten = []
@@ -134,10 +134,10 @@ for epoch in range(epochs):
     ########## Evaluation mode ###########
     model.eval()
     val_chord_loss = 0
-    melody, chord, length, chord_onehot, r_pitch, r_rhythm = val_melody.to(device), val_chord.to(device), val_length.to(device).squeeze(), val_chord_onehot.to(device), val_r_pitch.view(val_size,1,1).expand(val_size,272,1).to(device), val_r_rhythm.view(val_size,1,1).expand(val_size,272,1).to(device)
+    melody, chord, length, chord_onehot, r_pitch = val_melody.to(device), val_chord.to(device), val_length.to(device).squeeze(), val_chord_onehot.to(device), val_r_pitch.view(val_size,1,1).expand(val_size,272,1).to(device), 
 
     # Model prediction
-    chord_pred,logp ,mu, log_var, input_x = model(chord_onehot,melody,length,r_pitch, r_rhythm)
+    chord_pred,logp ,mu, log_var, input_x = model(chord_onehot,melody,length,r_pitch)
 
     # Arrange 
     chord_pred_flatten = []
@@ -178,4 +178,4 @@ for epoch in range(epochs):
 # np.save('reconstructed_one_hot_chords.npy', chord_pred.cpu().detach().numpy()) 
 
 # Save model
-torch.save(model.state_dict(), 'output_models/model_parameter_cvae_weighting.pth')
+torch.save(model.state_dict(), 'output_models/model_pitch_pattern_cvae_weighting.pth')

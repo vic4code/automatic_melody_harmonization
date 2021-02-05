@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import random
-from model.CVAE import CVAE
+from model.m2m_CVAE import CVAE
 
 ## Loss function
 def loss_fn(loss_function, logp, target, length, mean, log_var, anneal_function, step, k, x0):
@@ -47,7 +47,7 @@ def train(args):
     chord = np.load('./number_96.npy')
     chord_onehot = np.load('./onehot_96.npy')
     length = np.load('./length.npy')
-    weight_chord = np.load('./weight_chord_10000.npy')
+    weight_chord = np.load('./weight_chord.npy')
 
     #Splitting data
     print('splitting validation set...')
@@ -78,8 +78,7 @@ def train(args):
     lambda1 = lambda epoch: 0.995 ** epoch
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda1)
     loss_function = torch.nn.NLLLoss(reduction='sum')
-    cross_entropy = nn.CrossEntropyLoss(weight=weight_chord)
-    
+
     # Define annealing parameters
     step = 0
     k = 0.0025
@@ -105,7 +104,7 @@ def train(args):
             # Model prediction
     #         print(chord_onehot.shape)
     #         print(length.shape)
-            pred, logp ,mu, log_var, _ = model(chord_onehot,melody,length)
+            melody_pred, logp ,mu, log_var, _ = model(chord_onehot,melody,length)
 
             # Arrange 
             pred_flatten = []
@@ -119,10 +118,10 @@ def train(args):
                 logp_flatten.append(logp[i][:length[i]])
 
                 # Get predicted softmax chords by length of the song (cutting off padding 0), (1,length,12 * 24 * 2)
-                pred_flatten.append(pred[i][:length[i]])
+                pred_flatten.append(melody_pred[i][:length[i]])
 
                 # Get groundtruth chords by length of the song (cutting off padding 0), (1,length)
-                groundtruth_flatten.append(chord_onehot[i][:length[i]])
+                groundtruth_flatten.append(melody[i][:length[i]])
 
             # Rearrange for loss calculatio
             logp_flatten = torch.cat(logp_flatten, dim=0)
@@ -136,12 +135,12 @@ def train(args):
 
             # loss calculation
             # Cross Entropy
-            CE = cross_entropy(pred_flatten, groundtruth_index)
+    #         CE = cross_entropy(chord_pred_flatten, chord_groundtruth_index)
 
             # Add weight to NLL also
             NLL_loss, KL_loss, KL_weight = loss_fn(loss_function = loss_function, logp = logp_flatten, target = groundtruth_index, length = length, mean = mu, log_var = log_var,anneal_function='logistic', step=step, k=k, x0=x0)
             step += 1
-            loss = (CE + KL_weight * KL_loss) / batch_size
+            loss = (NLL_loss + KL_weight * KL_loss) / batch_size
             training_loss += loss.item()
 
             loss.backward()
@@ -155,7 +154,7 @@ def train(args):
         melody, length, chord_onehot = val_melody.to(device), val_length.to(device).squeeze(), val_chord_onehot.to(device)
 
         # Model prediction
-        pred, logp ,mu, log_var, _ = model(chord_onehot,melody,length)
+        melody_pred, logp ,mu, log_var, _ = model(chord_onehot,melody,length)
 
         # Arrange 
         pred_flatten = []
@@ -169,10 +168,10 @@ def train(args):
             logp_flatten.append(logp[i][:length[i]])
 
             # Get predicted softmax chords by length of the song (cutting off padding 0), (1,length,96)
-            pred_flatten.append(pred[i][:length[i]])
+            pred_flatten.append(melody_pred[i][:length[i]])
 
             # Get groundtruth chords by length of the song (cutting off padding 0), (1,length)
-            groundtruth_flatten.append(chord_onehot[i][:length[i]])
+            groundtruth_flatten.append(melody[i][:length[i]])
 
         # Rearrange for loss calculatio
         logp_flatten = torch.cat(logp_flatten, dim=0)
@@ -182,12 +181,12 @@ def train(args):
 
         # loss calculation
         # Cross Entropy
-        CE = cross_entropy(pred_flatten, groundtruth_index)
+#         CE = cross_entropy(chord_pred_flatten, chord_groundtruth_index)
 
         # Add weight to NLL also
         NLL_loss, KL_loss, KL_weight = loss_fn(loss_function = loss_function, logp = logp_flatten, target = groundtruth_index, length = length, mean = mu, log_var = log_var,anneal_function='logistic', step=step, k=k, x0=x0)
         step += 1
-        loss = (CE + KL_weight * KL_loss) / val_size
+        loss = (NLL_loss + KL_weight * KL_loss) / val_size
         validation_loss += loss.item()
 
         print('validation_loss: ', validation_loss)

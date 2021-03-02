@@ -9,29 +9,26 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import random
-from model.VAE import VAE
+from model.MusicVAE import MusicVAE
+from constants import Constants
 from scheduler import TeacherForcingScheduler, ParameterScheduler
 from sklearn.metrics import accuracy_score
 
 class TrainingVAE():
     def __init__(self, args, step=0, k=0.0025, x0=2500):
-        
+    
         self.batch_size = args.batch_size
         self.val_size = args.val_size
         self.epoch = args.epoch
         self.learning_rate = args.learning_rate
         self.cuda = args.cuda
+        self.device = torch.device('cuda:' + self.cuda) if torch.cuda.is_available() else 'cpu'
         self.step = step
         self.k = k
         self.x0 = x0
         self.training_loss = 0
         self.validation_loss = 0
         self.save_model = args.save_model
-        
-        tf_rates = [(0.5, 0)]
-        tfr_scheduler = TeacherForcingScheduler(*tf_rates[0])
-        params_dic = dict(tfr=tfr_scheduler)
-        self.param_scheduler = ParameterScheduler(**params_dic)
         
     ## Loss function
     def loss_fn(self,loss_function, logp, target, length, mean, log_var, anneal_function, step, k, x0):
@@ -95,7 +92,6 @@ class TrainingVAE():
         ########## Training mode ###########
             model.train()
             training_loss = self.training_loss
-            self.param_scheduler.train()
             dataloader = dataloader
             
             for _, _, length, chord_onehot in dataloader:
@@ -104,15 +100,13 @@ class TrainingVAE():
                 # chord (512, 272, 1) 
                 # length (512,1)
                 # chord_onehot (512, 272, 96)
-        
-                tfr = self.param_scheduler.step()
-                length, chord_onehot = length.to(device).squeeze(), chord_onehot.to(device)
+                length, chord_onehot = length.to(self.device).squeeze(), chord_onehot.to(self.device)
                 optimizer.zero_grad()
 
                 # Model prediction
         #         print(chord_onehot.shape)
         #         print(length.shape)
-                pred, logp ,mu, log_var, _ = model(chord_onehot,length,**tfr)
+                pred, logp ,mu, log_var, _ = model(chord_onehot,length)
 
                 # Arrange 
                 pred_flatten = []
@@ -156,12 +150,10 @@ class TrainingVAE():
         ########## Evaluation mode ###########
             model.eval()
             validation_loss = self.validation_loss
-            self.param_scheduler.eval()
-            length, chord_onehot = val_length.to(device).squeeze(), val_chord_onehot.to(device)
-            
-            tfr = self.param_scheduler.step()
+            length, chord_onehot = val_length.to(self.device).squeeze(), val_chord_onehot.to(self.device)
+
             # Model prediction
-            pred, logp ,mu, log_var, _ = model(chord_onehot,length,**tfr)
+            pred, logp ,mu, log_var, _ = model(chord_onehot,length)
 
             # Arrange 
             pred_flatten = []
@@ -201,20 +193,17 @@ class TrainingVAE():
 
     ## Model training  
     def run(self):
-
         batch_size = self.batch_size
         # validation data size
         val_size = self.val_size
         epochs = self.epoch
-    #     device = torch.device('cuda:0') if torch.cuda.is_available() else 'cpu'
-        device = torch.device('cuda:' + self.cuda)
 
         # Load data
         dataloader, val_chord_onehot, val_length = self.load_data()
 
         # Model
         print('building model...')
-        model = VAE(device = device).to(device)
+        model = MusicVAE(Constants.TEACHER_FORCING, eps_i=0.6, device = self.device).to(self.device)
         print(model)
 
         # Training parameters
@@ -233,8 +222,19 @@ class TrainingVAE():
         for epoch in tqdm(range(epochs)):
             print('epoch: ', epoch + 1)
             
-            self.train(device,model,optimizer,dataloader,step,k,x0,loss_function)
-            self.eval(device,model,val_chord_onehot,val_length,step,k,x0,loss_function)
+            self.train(self.device,
+                        model,
+                        optimizer,
+                        dataloader,
+                        step,k,x0,
+                        loss_function)
+
+            self.eval(self.device,
+                      model,
+                      val_chord_onehot,
+                      val_length,
+                      step,k,x0,
+                      loss_function)
 
         # Save recontructed results
         # np.save('reconstructed_one_hot_chords.npy', chord_pred.cpu().detach().numpy()) 

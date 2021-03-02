@@ -78,7 +78,7 @@ dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_worker
 
 # Model
 class multitask_model(nn.Module):
-    # lstm_dim (dim per timestep) = 12 notes * beat_resolution * 2 beat + chord types + mask
+    # lstm_dim (dim per timestep) = 12 notes * BEAT_RESOLUTION * 2 beat + chord types + mask
     def __init__(self, lstm_dim=12*24*2 + 96 + 1, fc_dim=128):
         super(multitask_model, self).__init__()
         self.bilstm = nn.LSTM(input_size=lstm_dim, hidden_size=fc_dim // 2, num_layers=2, batch_first=True, dropout=0.2,

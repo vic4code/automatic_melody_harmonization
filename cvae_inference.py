@@ -1,122 +1,250 @@
+import argparse
+from tqdm import tqdm
 import numpy as np
 import torch
 import pickle
 from decode import *
-from model.VAE import *
-from model.CVAE import *
+from model.CVAE import CVAE
 from metrics import CHE_and_CC, CTD, CTnCTR, PCS, MCTD
+from constants import Constants
+from sklearn.metrics import accuracy_score
 
-device = torch.device('cuda:1')
-val_size = 500
+class InferenceVAE():
+    def __init__(self,args, max_seq_len = 272):
+        
+        self.seed = args.seed
+        self.cuda = args.cuda
+        self.device = torch.device('cuda:' + self.cuda) if torch.cuda.is_available() else 'cpu'
+        self.latent_size = args.latent_size
+        self.max_seq_len = max_seq_len
+        self.model_path = args.model_path
+        self.inference_size = args.inference_size
+        self.outputdir = args.outputdir
+        self.metrics_filename = args.metrics_filename
+        self.decode_to_pianoroll = args.decode_to_pianoroll
+        self.random_sample = args.random_sample
+        
+        
+    def load_data(self):
+        # Load data
+        print('loading data...')
+        # Fake data
+#         melody_data = np.random.randint(128, size = (self.inference_size, 12056, 128))
+#         melody_condition = np.random.randint(128, size = (self.inference_size, 272, 2 * 12 * 24))
+#         chord_groundtruth = np.random.randint(96 ,size = (self.inference_size, 272, 128))
+#         chord_onehot = np.random.randint(96, size = (self.inference_size, 272, 96))
+#         lengths = np.random.randint(1,272, size = (self.inference_size,))
+#         tempos = [np.random.randint(180, size = (self.inference_size))] * self.inference_size
+#         downbeats = [np.random.choice(a=[False, True], size=(self.inference_size), p=[0.5, 0.5])] * self.inference_size
 
-# Load data
-print('loading data...')
-melody_data = np.load('./melody_data.npy')
-chord_groundtruth = np.load('./chord_groundtruth.npy')
-chord_onehot = np.load('./onehot_96.npy')
+        melody_data = np.load('./data/melody_data.npy')
+        chord_groundtruth = np.load('./data/chord_groundtruth.npy')
+        chord_onehot = np.load('./data/onehot_96.npy')
 
-melody = np.load('./melody_baseline.npy')
-lengths = np.load('./length.npy')
+        melody_condition = np.load('./data/melody_baseline.npy')
+        lengths = np.load('./data/length.npy')
 
-f = open('tempos', 'rb')
-tempos = pickle.load(f)
-f.close()
-f = open('downbeats', 'rb')
-downbeats = pickle.load(f)
-f.close()
+        f = open('./data/tempos', 'rb')
+        tempos = pickle.load(f)
+        f.close()
+        f = open('./data/downbeats', 'rb')
+        downbeats = pickle.load(f)
+        f.close()
 
-print('splitting testing set...')
-melody_data = melody_data[:val_size]
-chord_groundtruth = chord_groundtruth[:val_size]
+        print('splitting testing set...')
+        melody_data = melody_data[:self.inference_size]
+        chord_groundtruth = chord_groundtruth[:self.inference_size]
 
-val_chord = torch.from_numpy(chord_onehot[:val_size]).float()
-val_melody = torch.from_numpy(melody[:val_size]).float()
-val_length = torch.from_numpy(lengths[:val_size])
+        val_chord = torch.from_numpy(chord_onehot[:self.inference_size]).float()
+        val_melody_condition = torch.from_numpy(melody_condition[:self.inference_size]).float()
+        val_length = torch.from_numpy(lengths[:self.inference_size])
 
-tempos = tempos[:val_size]
-downbeats = downbeats[:val_size]
+        tempos = tempos[:self.inference_size]
+        downbeats = downbeats[:self.inference_size]
+        
+        return melody_data, val_melody_condition, chord_groundtruth, val_chord, val_length, tempos, downbeats
+        
+    ## Calculate objective metrics
+    def cal_objective_metrics(self,melody,chord_pred,length):
 
-# Load model
-print('building model...')
-model = CVAE(device = device).to(device)
-model.load_state_dict(torch.load('output_models/model_cvae_weighting.pth'))
-model.eval()
+        f = open('metrics/' + self.metrics_filename + '.txt', 'w')
+        m = [0 for i in range(6)]
+        for i in range(self.inference_size):
+            chord_pred_part = chord_pred[i][:length[i]]
+            melody_part = melody[i][:length[i]]
+        #     print(chord_pred_part.shape)
+        #     print(melody_part.shape)
 
-chord, val_length = val_chord.to(device), val_length.to(device)
+            che, cc = CHE_and_CC(chord_pred_part, chord_num=96)
+            ctd = CTD(chord_pred_part, chord_num=96)
+            ctnctr = CTnCTR(melody_part, chord_pred_part, chord_num=96)
+            pcs = PCS(melody_part, chord_pred_part, chord_num=96)
+            mctd = MCTD(melody_part, chord_pred_part, chord_num=96)
+            m[0] += che
+            m[1] += cc
+            m[2] += ctd
+            m[3] += ctnctr
+            m[4] += pcs
+            m[5] += mctd
+            f.write(str(che) + " " + str(cc) + " " + str(ctd) + " " + str(ctnctr) + " " + str(pcs) + " " + str(mctd) + '\n')
+        f.close()
 
-########## Inference ###########
-# Sampling
-latent_size = 16
-chord_preds = torch.empty(0).to(device)
-
-for i in range(val_size):
-    latent = torch.rand(1,272,latent_size).to(device)
-#     latent.device
-    melody = val_melody[i].unsqueeze(dim=0).to(device)
-#     melody.device
-    length = torch.Tensor([val_length[i]]).long().to(device)
-#     length.device
-#     print(length.dtype)
-#     print(length.device)
-#     print(length)
+        print('CHE: ', m[0]/self.inference_size)
+        print('CC: ', m[1]/self.inference_size)
+        print('CTD: ', m[2]/self.inference_size)
+        print('CTnCTR: ', m[3]/self.inference_size)
+        print('PCS: ', m[4]/self.inference_size)
+        print('MCTD: ', m[5]/self.inference_size)
     
-    z = torch.cat((latent,melody), dim=-1)
-    _, chord_pred = model.decode(z,length)
-    chord_preds = torch.cat((chord_preds,chord_pred), dim=0)
-
-# Proceed chord decode
-print('proceed chord decode...')
-chord_preds = chord_preds.cpu().detach().numpy()
-joint_prob = chord_preds
-
-val_length = val_length.cpu().detach().numpy()
-
-# Append argmax index to get pianoroll array
-accompany_pianoroll = argmax2pianoroll(joint_prob)
-
-# augment chord into frame base
-beat_resolution = 24
-beat_per_chord = 2
-
-accompany_pianoroll_frame, chord_groundtruth_frame = sequence2frame(accompany_pianoroll, chord_groundtruth, beat_resolution=beat_resolution, beat_per_chord=beat_per_chord)
-
-# length into frame base
-length = val_length * beat_resolution * beat_per_chord
-
-# write pianoroll
-result_dir = 'results/cvae_weighting_sample_result'
-write_pianoroll(result_dir, melody_data, accompany_pianoroll_frame,chord_groundtruth_frame, length, tempos,downbeats)
-
-# cal metrics
-val_melody = val_melody.cpu().detach().numpy()
-
-f = open('cvae_weighting_metrics.txt', 'w')
-m = [0 for i in range(6)]
-for i in range(val_size):
-    chord_pred_part = chord_preds[i][:val_length[i]]
-    melody_part = val_melody[i][:val_length[i]]
-#     print(chord_pred_part.shape)
-#     print(melody_part.shape)
+    ## Reconstruction rate (accuracy):
+    def cal_reconstruction_rate(self,y_true,y_pred):
+        y_true = y_true.flatten()
+        y_pred = y_pred.flatten()
+        acc = accuracy_score(y_true,y_pred)
+        print('Accuracy:' + f'{acc:.2f}')
     
-    
-    che, cc = CHE_and_CC(chord_pred_part, chord_num=96)
-    ctd = CTD(chord_pred_part, chord_num=96)
-    ctnctr = CTnCTR(melody_part, chord_pred_part, chord_num=96)
-    pcs = PCS(melody_part, chord_pred_part, chord_num=96)
-    mctd = MCTD(melody_part, chord_pred_part, chord_num=96)
-    m[0] += che
-    m[1] += cc
-    m[2] += ctd
-    m[3] += ctnctr
-    m[4] += pcs
-    m[5] += mctd
-    f.write(str(che) + " " + str(cc) + " " + str(ctd) + " " + str(ctnctr) + " " + str(pcs) + " " + str(mctd) + '\n')
-f.close()
+    def load_model(self,model_path):
+        # Load model
+        print('building model...')
+        model = CVAE(device = self.device).to(self.device)
+        model.load_state_dict(torch.load('output_models/' + model_path + '.pth'))
+        
+        return model
+        
+    def sample_one_by_one(self, model, melody_data, chord_groundtruth, tempos, downbeats):
+        
+        np.random.seed(self.seed)
+        indices = np.random.randint(500, size=self.inference_size)
+#         print(indices)
 
-print('CHE: ', m[0]/val_size)
-print('CC: ', m[1]/val_size)
-print('CTD: ', m[2]/val_size)
-print('CTnCTR: ', m[3]/val_size)
-print('PCS: ', m[4]/val_size)
-print('MCTD: ', m[5]/val_size)
+        for index in indices:
+            melody_truth = np.expand_dims(melody_data[index], axis=0)
+            chord_truth = np.expand_dims(chord_groundtruth[index], axis=0)
+            tempo = [tempos[index]]
+            downbeat = [downbeats[index]]
+
+            melody = val_melody_condition[index].unsqueeze(dim=0)
+            melody = melody.view(1,-1)
+            inference_length = torch.Tensor([val_length[index]]).long()
+
+            # Sampling
+            torch.manual_seed(self.seed)
+            latent = torch.rand(1,self.latent_size).to(self.device)
+
+    #         z = torch.cat((latent,melody1,r_pitch,r_rhythm), dim=-1)
+            z = torch.cat((latent,melody), dim=-1)
+
+            _, sample = model.decode(z,inference_length)
+
+            ########## Random sampling ###########
+            # Proceed chord decode
+            print('proceed chord decode...')
+            decode_length = inference_length
+            joint_prob = sample.cpu().detach().numpy()
+
+            # Append argmax index to get pianoroll array
+            accompany_pianoroll = argmax2pianoroll(joint_prob)
+
+            # augment chord into frame base
+            accompany_pianoroll_frame, chord_groundtruth_frame = sequence2frame(accompany_pianoroll, chord_truth, BEAT_RESOLUTION=Constants.BEAT_RESOLUTION, BEAT_PER_CHORD=Constants.BEAT_PER_CHORD)
+            
+            # length into frame base
+            decode_length = decode_length * Constants.BEAT_RESOLUTION * Constants.BEAT_PER_CHORD
+
+            # write pianoroll
+            result_dir = 'results/' + self.outputdir
+    #         filename = str(index) + '-pitch-' + str(args.pitch_ratio) + '-rhythm-' + str(args.rhythm_ratio)
+            filename = str(index)
+            print(result_dir)
+            print(result_dir + '/' + filename + '.mid')
+            write_one_pianoroll(result_dir, filename ,melody_truth, accompany_pianoroll_frame,chord_groundtruth_frame, decode_length, tempo,downbeat)
+        
+    def sample_from_latent(self, model, melody_condition, chord):
+        # Sampling
+        latent = torch.rand(self.inference_size,self.latent_size).to(self.device)
+        melody_condition = melody_condition.view(self.inference_size,-1)
+        print('latent device',latent.device)
+        print('melody device',melody_condition.device)
+        z = torch.cat((latent,melody_condition), dim=-1)
+        tfr = 0
+        _,samples = model.decode(self.inference_size,z,tfr,None)
+        
+        return samples
+    
+    def decode2pianoroll(self, melody_data, val_length, accompany_pianoroll, chord_groundtruth, tempos, downbeats, BEAT_RESOLUTION=Constants.BEAT_RESOLUTION, BEAT_PER_CHORD=Constants.BEAT_PER_CHORD):
+        
+        # augment chord into frame base
+        accompany_pianoroll_frame, chord_groundtruth_frame = sequence2frame(accompany_pianoroll, chord_groundtruth, BEAT_RESOLUTION=Constants.BEAT_RESOLUTION, BEAT_PER_CHORD=Constants.BEAT_PER_CHORD)
+
+        # length into frame base
+        length = val_length * Constants.BEAT_RESOLUTION * Constants.BEAT_PER_CHORD
+
+        # write pianoroll
+        result_dir = 'results/' + self.outputdir
+        write_pianoroll(result_dir, melody_data, accompany_pianoroll_frame,chord_groundtruth_frame, length, tempos,downbeats)
+
+    ## Model inference
+    def run(self):
+        
+        melody_data, val_melody_condition, chord_groundtruth, val_chord, val_length, tempos, downbeats = self.load_data()
+        val_melody_condition, val_chord, val_length = val_melody_condition.to(self.device), val_chord.to(self.device), val_length.to(self.device).squeeze()
+        val_length = val_length.cpu().detach().numpy()
+        
+        model = self.load_model(self.model_path)
+        model.eval()  
+        
+        if self.random_sample:
+            self.sample_one_by_one(model, melody_data, chord_groundtruth, tempos, downbeats)
+        
+        else:
+            ########## Sampling ###########
+            with torch.no_grad():
+                samples = self.sample_from_latent(model, val_melody_condition, val_chord)
+
+            # Proceed chord decode
+            print('proceed chord decode...')
+            samples = samples.cpu().detach().numpy()
+            joint_prob = samples
+
+            # Append argmax index to get pianoroll array
+            accompany_pianoroll = argmax2pianoroll(joint_prob)
+
+            # Calculate accuracy
+            self.cal_reconstruction_rate(chord_groundtruth,accompany_pianoroll)
+
+            # cal metrics
+            val_melody_condition = val_melody_condition.cpu().detach().numpy()
+            self.cal_objective_metrics(val_melody_condition, samples, val_length)
+            
+            # Decode to pianoroll or not
+            if self.decode_to_pianoroll:
+                self.decode2pianoroll(melody_data, val_length, accompany_pianoroll, chord_groundtruth, tempos, downbeats)
+    
+
+## Main
+def main():
+    ''' 
+    Usage:
+    python cvae_inference.py -model_path ///
+    '''
+
+    parser = argparse.ArgumentParser(description='Set configs to training process.') 
+    
+    parser.add_argument('-latent_size', type=int, default=256) 
+    parser.add_argument('-inference_size', type=int, default=500) 
+    parser.add_argument('-model_path', type=str, required=True)
+    parser.add_argument('-outputdir', type=str, default='new_results')
+    parser.add_argument('-metrics_filename', type=str, default='new_metrics')
+    parser.add_argument('-cuda', type=str, default='0')
+    parser.add_argument('-seed', default=30, type=str, help='random seed')
+    parser.add_argument('-decode_to_pianoroll', default=False)
+    parser.add_argument('-random_sample', default=False)
+    
+    args = parser.parse_args()
+    
+    inference = InferenceVAE(args)
+    inference.run()
+    
+if __name__ == '__main__':
+    main()
 

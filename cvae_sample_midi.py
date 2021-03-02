@@ -122,13 +122,13 @@ def main():
         accompany_pianoroll = argmax2pianoroll(joint_prob)
 
         # augment chord into frame base
-        beat_resolution = 24
-        beat_per_chord = 2
+        BEAT_RESOLUTION = 24
+        BEAT_PER_CHORD = 2
 
-        accompany_pianoroll_frame, chord_groundtruth_frame = sequence2frame(accompany_pianoroll, chord_truth, beat_resolution=beat_resolution, beat_per_chord=beat_per_chord)
+        accompany_pianoroll_frame, chord_groundtruth_frame = sequence2frame(accompany_pianoroll, chord_truth, BEAT_RESOLUTION=BEAT_RESOLUTION, BEAT_PER_CHORD=BEAT_PER_CHORD)
 
         # length into frame base
-        decode_length = decode_length * beat_resolution * beat_per_chord
+        decode_length = decode_length * BEAT_RESOLUTION * BEAT_PER_CHORD
 
         # write pianoroll
         result_dir = 'results/' + args.outputdir

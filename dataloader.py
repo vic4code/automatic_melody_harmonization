@@ -47,3 +47,30 @@ class Parameterized_Dataset(Dataset):
 
     def __len__(self):
         return (self.melody.shape[0])
+    
+
+# Parameterized Dataset
+class Objective_Parameterized_Dataset(Dataset):
+    def __init__(self, melody, chord, length, chord_onehot, cc):
+#         super().__init__(melody, chord, length, chord_onehot, pitch_pattern_ratio, pitch_pattern_rhythm)
+        self.melody = melody
+        self.chord = chord
+        # (batch,1) -> (batch,1,1)
+        self.length = np.expand_dims(length, axis=1)
+        self.chord_onehot = chord_onehot
+        # (batch,1) -> (batch,1,1)
+        self.cc = np.expand_dims(cc, axis=1)
+#         self.pitch_pattern_rhythm = np.expand_dims(pitch_pattern_rhythm, axis=1)
+
+    def __getitem__(self, index):
+        x = torch.from_numpy(self.melody[index]).float()
+        y = torch.from_numpy(self.chord[index]).float()
+        l = torch.from_numpy(self.length[index])
+        x2 = torch.from_numpy(self.chord_onehot[index]).float()
+        CC = torch.from_numpy(self.cc[index]).float()
+#         r_rhythm = torch.from_numpy(self.pitch_pattern_rhythm[index]).float()
+        
+        return x, y, l, x2, CC
+
+    def __len__(self):
+        return (self.melody.shape[0])

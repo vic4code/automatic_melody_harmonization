@@ -160,8 +160,8 @@ print('MCTD: ', m[5]/val_size)
 # accompany_pianoroll = chord_pianoroll * 100
 # print(chord_pianoroll.shape)
 #
-# beat_resolution = 24
-# beat_per_chord = 2
+# BEAT_RESOLUTION = 24
+# BEAT_PER_CHORD = 2
 #
 # # augment chord into frame base
 # print('augment chord into frame base...')
@@ -171,7 +171,7 @@ print('MCTD: ', m[5]/val_size)
 #     acc_pianoroll = []
 #     truth_pianoroll = []
 #     for acc_beat, truth_beat in zip(acc_song, truth_song):
-#         for i in range(beat_resolution*beat_per_chord):
+#         for i in range(BEAT_RESOLUTION*BEAT_PER_CHORD):
 #             acc_pianoroll.append(acc_beat)
 #             truth_pianoroll.append(truth_beat)
 #     accompany_pianoroll_frame.append(acc_pianoroll)
@@ -183,7 +183,7 @@ print('MCTD: ', m[5]/val_size)
 # print('groundtruth_pianoroll shape:', chord_groundtruth_frame.shape)
 #
 # # length into frame base
-# length = length * beat_resolution * beat_per_chord
+# length = length * BEAT_RESOLUTION * BEAT_PER_CHORD
 #
 # # write pianoroll
 # print('write pianoroll...')
@@ -199,8 +199,8 @@ print('MCTD: ', m[5]/val_size)
 #     track2 = Track(pianoroll=chord_roll)
 #     track3 = Track(pianoroll=truth_roll)
 #
-#     generate = Multitrack(tracks=[track1, track2], tempo=tempo, downbeat=downbeat, beat_resolution=beat_resolution)
-#     truth = Multitrack(tracks=[track1, track3], tempo=tempo, downbeat=downbeat, beat_resolution=beat_resolution)
+#     generate = Multitrack(tracks=[track1, track2], tempo=tempo, downbeat=downbeat, BEAT_RESOLUTION=BEAT_RESOLUTION)
+#     truth = Multitrack(tracks=[track1, track3], tempo=tempo, downbeat=downbeat, BEAT_RESOLUTION=BEAT_RESOLUTION)
 #
 #     pr.write(generate, './gibbs_96_weight_result/generate_' + str(counter) + '.mid')
 #     pr.write(truth, './gibbs_96_weight_result/groundtruth_' + str(counter) + '.mid')

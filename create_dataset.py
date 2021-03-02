@@ -7,9 +7,9 @@ import json
 import math
 
 # Beat unit frame size
-beat_resolution = 24
+BEAT_RESOLUTION = 24
 # 
-beat_per_chord = 1
+BEAT_PER_CHORD = 1
 
 melody_data = []
 chord_groundtruth = []
@@ -62,7 +62,7 @@ for root, dirs, files in os.walk("../lead-sheet-dataset/datasets/pianoroll"):
                 for i in range(chord.pianoroll.shape[0]):
                     
                     # Get the chord per 2 beats 
-                    if i%(beat_resolution*beat_per_chord) == 0:
+                    if i%(BEAT_RESOLUTION*BEAT_PER_CHORD) == 0:
                         chord_list.append(chord.pianoroll[i])
                         
                 # Chord to numpy
@@ -102,8 +102,8 @@ for root, dirs, files in os.walk("../lead-sheet-dataset/datasets/pianoroll"):
                 symbol_len = event_off[-1]
                 
                 # Get the max length of the event_off in the normalized order (per 2 beats)
-                if (event_off[-1]//beat_per_chord) > max_event_off:
-                    max_event_off = event_off[-1]//beat_per_chord
+                if (event_off[-1]//BEAT_PER_CHORD) > max_event_off:
+                    max_event_off = event_off[-1]//BEAT_PER_CHORD
                 
                 # Fill the corresponding chords to the symbol_list
                 # [...,None,event_on(C),None,None,None,event_off(C),None,...]
@@ -112,7 +112,7 @@ for root, dirs, files in os.walk("../lead-sheet-dataset/datasets/pianoroll"):
                         symbol_list[j] = symbol[i]
                 
                 # Indexing data per 2 beats
-                symbol_list = symbol_list[::beat_per_chord]
+                symbol_list = symbol_list[::BEAT_PER_CHORD]
                 symbol_data.append(symbol_list)
                 f.close()
                 
@@ -139,8 +139,8 @@ for root, dirs, files in os.walk("../lead-sheet-dataset/datasets/pianoroll"):
                 borrowed_list = [None for i in range(event_off[-1])]
                 romen_len = event_off[-1]
                 
-                if (event_off[-1] // beat_per_chord) > max_event_off:
-                    max_event_off = event_off[-1] // beat_per_chord
+                if (event_off[-1] // BEAT_PER_CHORD) > max_event_off:
+                    max_event_off = event_off[-1] // BEAT_PER_CHORD
                     
                 for i in range(len(roman)):
                     for j in range(event_on[i], event_off[i]):
@@ -148,9 +148,9 @@ for root, dirs, files in os.walk("../lead-sheet-dataset/datasets/pianoroll"):
                         sec_list[j] = sec[i]
                         borrowed_list[j] = borrowed[i]
                         
-                roman_list = roman_list[::beat_per_chord]
-                sec_list = sec_list[::beat_per_chord]
-                borrowed_list = borrowed_list[::beat_per_chord]
+                roman_list = roman_list[::BEAT_PER_CHORD]
+                sec_list = sec_list[::BEAT_PER_CHORD]
+                borrowed_list = borrowed_list[::BEAT_PER_CHORD]
                 roman_data.append(roman_list)
                 sec_data.append(sec_list)
                 borrowed_data.append(borrowed_list)
@@ -176,41 +176,41 @@ print(chord_groundtruth.shape)
 print(length.shape)
 
 # Save np arrays 
-np.save('melody_data_' + str(beat_per_chord) + '_beat', melody_data)
-np.save('chord_groundtruth_' + str(beat_per_chord) + '_beat' , chord_groundtruth)
-np.save('length_' + str(beat_per_chord) + '_beat', length)
+np.save('melody_data_' + str(BEAT_PER_CHORD) + '_beat', melody_data)
+np.save('chord_groundtruth_' + str(BEAT_PER_CHORD) + '_beat' , chord_groundtruth)
+np.save('length_' + str(BEAT_PER_CHORD) + '_beat', length)
 
 # Save as pickle files
-f = open('tempos_' + str(beat_per_chord) + '_beat', 'wb')
+f = open('tempos_' + str(BEAT_PER_CHORD) + '_beat', 'wb')
 pickle.dump(tempos, f)
 f.close()
-f = open('downbeats_' + str(beat_per_chord) + '_beat', 'wb')
+f = open('downbeats_' + str(BEAT_PER_CHORD) + '_beat', 'wb')
 pickle.dump(downbeats, f)
 f.close()
 
 print('max event off:', max_event_off)
 print('len of symbol data:', len(symbol_data))
-f = open('symbol_data_' + str(beat_per_chord) + '_beat' , 'wb')
+f = open('symbol_data_' + str(BEAT_PER_CHORD) + '_beat' , 'wb')
 pickle.dump(symbol_data, f)
 f.close()
 
 print('len of roman data:' , len(roman_data))
-f = open('roman_data_' + str(beat_per_chord) + '_beat' , 'wb')
+f = open('roman_data_' + str(BEAT_PER_CHORD) + '_beat' , 'wb')
 pickle.dump(roman_data, f)
 f.close()
 
 print('len of sec data:', len(sec_data))
-f = open('sec_data_' + str(beat_per_chord) + '_beat', 'wb')
+f = open('sec_data_' + str(BEAT_PER_CHORD) + '_beat', 'wb')
 pickle.dump(sec_data, f)
 f.close()
 
 print('len of borrowed data:', len(borrowed_data))
-f = open('borrowed_data_'+ str(beat_per_chord) + '_beat', 'wb')
+f = open('borrowed_data_'+ str(BEAT_PER_CHORD) + '_beat', 'wb')
 pickle.dump(borrowed_data, f)
 f.close()
 
 print('len of mode data:', len(mode_data))
-f = open('mode_data_'+ str(beat_per_chord) + '_beat', 'wb')
+f = open('mode_data_'+ str(BEAT_PER_CHORD) + '_beat', 'wb')
 pickle.dump(mode_data, f)
 f.close()
 

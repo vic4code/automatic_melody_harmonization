@@ -1,6 +1,7 @@
 import math
 import numpy as np
 
+# Pianoroll (midi) to index numbers
 def pianoroll2number(pianoroll):
     midi_number = []
     for i in range(128):
@@ -12,6 +13,7 @@ def pianoroll2number(pianoroll):
     
     return midi_number
 
+# Index to 12 notes onehot 
 def number2onehot(number):
     onehot = [0 for i in range(12)]
     for i in number:
@@ -19,6 +21,7 @@ def number2onehot(number):
 
     return onehot
 
+# Find root note in Pianoroll (midi) 
 def pianoroll2base(pianoroll):
     midi_number = []
     for i in range(128):
@@ -31,6 +34,7 @@ def pianoroll2base(pianoroll):
     
     return midi_number
 
+# Note string to 12 onehot index
 def note2number(notes):
     note2num = {'C':0,
                 'C#':1, 'Db':1,
@@ -48,6 +52,8 @@ def note2number(notes):
     for note in notes:
         num.append(note2num[note])
     return num
+
+# Index number to note strings in 96 chords case
 def chord962note(chord):
     chord_list = [
                 ['C','E','G'], ['C','Eb','G'], ['C','E','G#'], ['C','Eb','Gb'], ['C','F','G'], ['C','E','G','B'], ['C','Eb','G','Bb'], ['C','E','G','Bb'],
@@ -65,6 +71,7 @@ def chord962note(chord):
     ]
     return chord_list[chord]
 
+# Index number to note strings in 48 chords case
 def chord482note(chord):
     chord_list = [
                 ['C','E','G'], ['C','Eb','G'], ['C','E','G#'], ['C','Eb','Gb'],
@@ -82,6 +89,7 @@ def chord482note(chord):
     ]
     return chord_list[chord]
 
+# Calculate tonal coordinate in tonal space
 def tonal_centroid(notes):
     fifths_lookup = {9:[1.0, 0.0], 2:[math.cos(math.pi / 6.0), math.sin(math.pi / 6.0)], 7:[math.cos(2.0 * math.pi / 6.0), math.sin(2.0 * math.pi / 6.0)],
                      0:[0.0, 1.0], 5:[math.cos(4.0 * math.pi / 6.0), math.sin(4.0 * math.pi / 6.0)], 10:[math.cos(5.0 * math.pi / 6.0), math.sin(5.0 * math.pi / 6.0)],
@@ -114,6 +122,7 @@ def tonal_centroid(notes):
 
     return fifths + minor + major
 
+# Calculate tonal coordinate for root note in tonal space ??
 def tonal_centroid_base(base):
     fifths_lookup = {9:[1.0, 0.0], 2:[math.cos(math.pi / 6.0), math.sin(math.pi / 6.0)], 7:[math.cos(2.0 * math.pi / 6.0), math.sin(2.0 * math.pi / 6.0)],
                      0:[0.0, 1.0], 5:[math.cos(4.0 * math.pi / 6.0), math.sin(4.0 * math.pi / 6.0)], 10:[math.cos(5.0 * math.pi / 6.0), math.sin(5.0 * math.pi / 6.0)],
@@ -135,7 +144,7 @@ def tonal_centroid_base(base):
 
     return fifths + diatonic
 
-
+# Chord scale degree to chord function defined in Yeh's paper
 def chord_function(base):
     chord_function_lookup = {0:[0], 1:[2], 2:[1], 3:[1], 4:[2], 5:[1], 6:[1], 7:[2], 8:[2], 9:[0], 10:[1], 11:[2]}
 
@@ -145,16 +154,19 @@ def chord_function(base):
 
     return function
 
+# 
 def softmax(x):
     """Compute softmax values for each sets of scores in x."""
     return np.exp(x) / np.sum(np.exp(x), axis=0)
 
+#
 def neg_dist(x, y):
     dis = 0
     for i, j in zip(x, y):
         dis += math.pow(i-j, 2)
     return -math.sqrt(dis)
 
+# Coordinate to the closest chord in tonal space 
 def tonal2chord_prob(embedding):
     #order: major, minor. aug, dim, sus, major7, minor7, dominant7
     chord_list = [
@@ -186,6 +198,7 @@ def tonal2chord_prob(embedding):
 
     return prob
 
+# Coordinate to the closest chord in tonal space for 48 chords
 def tonal2chord_prob48(embedding):
     #order: major, minor. aug, dim, sus, major7, minor7, dominant7
     chord_list = [
@@ -217,6 +230,7 @@ def tonal2chord_prob48(embedding):
 
     return prob
 
+# Add weights to chord function
 def function2chord_prob(function):
     function_list = [0, 0, 0, 0, 0, 0, 0, 0,
                     2, 2, 2, 2, 2, 2, 2, 2,
@@ -244,6 +258,8 @@ def function2chord_prob(function):
 
     return np.asarray(chord_prob)
 
+
+# Add weights to chord function on scale degree
 def function2chord_prob_baseline(function):
     function_list = [0, 0, 1, 1,
                      1, 1, 1, 1,
@@ -271,6 +287,7 @@ def function2chord_prob_baseline(function):
 
     return np.asarray(chord_prob)
 
+# 
 def alter2chord_prob(alter):
     # order: major, minor. aug, dim, sus, major7, minor7, dominant7
     alter_list = [0, 1, 1, 1, 0, 0, 1, 1,
@@ -296,6 +313,7 @@ def alter2chord_prob(alter):
 
     return np.asarray(chord_prob)
 
+# Argmax to composition chord string 
 def joint_prob2chord(probs):
     #order: major, minor. aug, dim, sus, major7, minor7, dominant7
     chord_list = [
@@ -316,6 +334,7 @@ def joint_prob2chord(probs):
     index = np.argmax(probs, axis=0)
     return chord_list[index]
 
+# Chord index to composition notes in midi pianoroll for 96 chords
 def joint_prob2pianoroll96(probs):
     #order: major, minor. aug, dim, sus, major7, minor7, dominant7
     chord_list = [
@@ -339,6 +358,7 @@ def joint_prob2pianoroll96(probs):
     pianoroll = np.asarray(pianoroll)
     return pianoroll
 
+# Chord index to composition notes in midi pianoroll for 48 chords
 def joint_prob2pianoroll48(probs):
     #order: major, minor. aug, dim, sus, major7, minor7, dominant7
     chord_list = [
@@ -362,6 +382,7 @@ def joint_prob2pianoroll48(probs):
     pianoroll = np.asarray(pianoroll)
     return pianoroll
 
+
 def tonal_base2prob(embedding):
     base_list = [[i] for i in range(12)]
 
@@ -381,6 +402,7 @@ def tonal_base2prob(embedding):
 
     return prob
 
+
 def function2base_prob(function):
     function_list = [0, 2, 1, 1, 2, 1, 1, 2, 1, 0, 1, 2]
 
@@ -398,6 +420,7 @@ def function2base_prob(function):
 
     return np.asarray(base_prob)
 
+
 def alter2base_prob(alter):
     alter_list = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0]
 
@@ -412,6 +435,7 @@ def alter2base_prob(alter):
 
     return np.asarray(base_prob)
 
+# Root note index to midi index
 def base_prob2pianoroll(probs):
     base_list = [24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
 
@@ -421,6 +445,7 @@ def base_prob2pianoroll(probs):
     pianoroll = np.asarray(pianoroll)
     return pianoroll
 
+# Chord string to chord index
 def symbol2number96(symbol):
     # order: major, minor. aug, dim, sus, major7, minor7, dominant7
     order = 0
@@ -506,6 +531,7 @@ def symbol2number96(symbol):
 
     return np.asarray([index * 8 + (order - 1)])
 
+# Chord string to onehot for 96 chords
 def symbol2onehot96(symbol):
     # order: major, minor. aug, dim, sus, major7, minor7, dominant7
     order = 0
@@ -593,6 +619,7 @@ def symbol2onehot96(symbol):
     s[index * 8 + (order - 1)] = 1
     return s
 
+# Chord string to chord index for 48 chords
 def symbol2number48(symbol):
     # order: major, minor. aug, dim, sus, major7, minor7, dominant7
     order = 0
@@ -661,6 +688,7 @@ def symbol2number48(symbol):
 
     return np.asarray([index*4 + (order-1)])
 
+# Chord string to onehot for 48 chords
 def symbol2onehot48(symbol):
     # order: major, minor. aug, dim, sus, major7, minor7, dominant7
     order = 0
@@ -731,6 +759,7 @@ def symbol2onehot48(symbol):
     s[index * 4 + (order - 1)] = 1
     return s
 
+# Chord function 
 def chord_function_symbol(index):
     # order: major, minor. aug, dim, sus, major7, minor7, dominant7
     #TODO!!!
@@ -740,6 +769,8 @@ def chord_function_symbol(index):
                              ]
     return chord_function_lookup[index]
 
+
+# Chord function  
 def chord_function_symbol_baseline(number):
     # order: major, minor. aug, dim
     chord_function_lookup = [0, 0, 1, 1,
@@ -756,6 +787,7 @@ def chord_function_symbol_baseline(number):
                              1, 1, 1, 2]
 
     return [chord_function_lookup[number[0]]]
+
 
 def chord_function_symbol_baseline_onehot(number):
     # order: major, minor. aug, dim
@@ -775,6 +807,7 @@ def chord_function_symbol_baseline_onehot(number):
     function[chord_function_lookup[number[0]]] = 1
     return function
 
+# Check if the chord is alter
 def alter_or_not(number):
     alter = [0]
     if number:
@@ -783,12 +816,14 @@ def alter_or_not(number):
 
     return alter
 
+# 
 def roman2romantrain(roman):
     #0 for degree 1 ... 6 for degree 7
     if roman == 'rest':
         return [0], 1
     return [int(roman)-1], 0
 
+# Check if the chord is alter
 def roman2romantrainonehot(roman):
     r = [0 for i in range(7)]
     # 0 for degree 1 ... 6 for degree 7
@@ -799,6 +834,7 @@ def roman2romantrainonehot(roman):
     r[int(roman)-1] = 1
     return r
 
+# Secondary chord to training data
 def sec2sectrain(sec):
     #0 for no sec
     #1 for offset 1 (sec: 2) ... 6 for offset 6 (sec: 7)
@@ -817,6 +853,8 @@ def sec2sectrainonehot(sec):
         s[0] = 1
 
     return s
+
+
 def borrowed2borrowedtrain(borrowed):
     # 6 - S(6) Supermode     (F#) - ######
     #  5 - S(5) Supermode      (B) - #####
@@ -844,6 +882,7 @@ def borrowed2borrowedtrain(borrowed):
     borrowed_table = {'0':[0], '-1':[1], '-2':[2], '-3':[3], '-4':[4], '-5':[5], '-6':[6],
                       '1': [7], '2':[8], '3':[9], '4':[10], '5':[11], '6':[12], 'None':[13]}
     return borrowed_table[borrowed]
+
 
 def borrowed2borrowedtrainonehot(borrowed):
     # 6 - S(6) Supermode     (F#) - ######
@@ -876,6 +915,7 @@ def borrowed2borrowedtrainonehot(borrowed):
 
     return b
 
+# Roman chord to chord probability
 def roman2chord_prob(mode, roman, sec, borrowed):
     # alpha = [100, 100, 100]
     # for i in range(len(roman)):

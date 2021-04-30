@@ -9,14 +9,14 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import random
-from model.MusicVAE import MusicVAE
+from model.MusicVAE_GRU import MusicVAE
 from constants import Constants
-from scheduler import TeacherForcingScheduler, ParameterScheduler
 from sklearn.metrics import accuracy_score
 
 class TrainingVAE():
     def __init__(self, args, step=0, k=0.0025, x0=2500):
-    
+        
+        self.teacher_forcing_rate = args.tfr
         self.batch_size = args.batch_size
         self.val_size = args.val_size
         self.epoch = args.epoch
@@ -29,6 +29,7 @@ class TrainingVAE():
         self.training_loss = 0
         self.validation_loss = 0
         self.save_model = args.save_model
+        self.weight = args.weight
         
     ## Loss function
     def loss_fn(self,loss_function, logp, target, length, mean, log_var, anneal_function, step, k, x0):
@@ -50,34 +51,31 @@ class TrainingVAE():
                 return min(1, step/x0) 
 
     def load_data(self):
-        
-        batch_size = self.batch_size
-        val_size = self.val_size
-        
+  
         # Load data
         print('loading data...')
         melody = np.load('./data/melody_baseline.npy')
         chord = np.load('./data/number_96.npy')
         chord_onehot = np.load('./data/onehot_96.npy')
         length = np.load('./data/length.npy')
-    #     weight_chord = np.load('./data/weight_chord_10000.npy')
+        weight_chord = np.load('./data/weight_chord.npy')
 
         #Splitting data
         print('splitting validation set...')
-        train_melody = melody[val_size:]
-        val_melody = torch.from_numpy(melody[:val_size]).float()
-        train_chord = chord[val_size:]
-        val_chord = torch.from_numpy(chord[:val_size]).float()
-        train_chord_onehot = chord_onehot[val_size:]
-        val_chord_onehot = torch.from_numpy(chord_onehot[:val_size]).float()
-        train_length = length[val_size:]
-        val_length = torch.from_numpy(length[:val_size])
-    #     weight_chord = torch.from_numpy(weight_chord).float().to(device)
+        train_melody = melody[self.val_size:]
+        val_melody = torch.from_numpy(melody[:self.val_size]).float()
+        train_chord = chord[self.val_size:]
+        val_chord = torch.from_numpy(chord[:self.val_size]).float()
+        train_chord_onehot = chord_onehot[self.val_size:]
+        val_chord_onehot = torch.from_numpy(chord_onehot[:self.val_size]).float()
+        train_length = length[self.val_size:]
+        val_length = torch.from_numpy(length[:self.val_size])
+        weight_chord = torch.from_numpy(weight_chord).float().to(device)
 
         # Create dataloader
         print('creating dataloader...')
         dataset = ChordGenerDataset(train_melody, train_chord, train_length, train_chord_onehot)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=16, drop_last=True)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=16, drop_last=True)
 
         return dataloader, val_chord_onehot, val_length
     
@@ -87,7 +85,9 @@ class TrainingVAE():
         y_pred = y_pred.flatten()
         acc = accuracy_score(y_true,y_pred)
         print('Accuracy:' + f'{acc:.4f}')
-    
+        
+        return acc
+        
     def train(self,device,model,optimizer,dataloader,step,k,x0,loss_function):  
         ########## Training mode ###########
             model.train()
@@ -132,13 +132,10 @@ class TrainingVAE():
                 groundtruth_index = torch.max(groundtruth_flatten,1).indices
 
                 # loss calculation
-                # Cross Entropy
-    #             CE = cross_entropy(pred_flatten, groundtruth_index)
-
                 # Add weight to NLL also
                 NLL_loss, KL_loss, KL_weight = self.loss_fn(loss_function = loss_function, logp = logp_flatten, target = groundtruth_index, length = length, mean = mu, log_var = log_var,anneal_function='logistic', step=step, k=k, x0=x0)
                 self.step += 1
-                loss = (NLL_loss + KL_weight * KL_loss) / self.batch_size
+                loss = (NLL_loss + KL_weight * KL_loss)
                 training_loss += loss.item()
 
                 loss.backward()
@@ -179,17 +176,20 @@ class TrainingVAE():
             groundtruth_flatten = torch.cat(groundtruth_flatten,dim=0).long()
             groundtruth_index = torch.max(groundtruth_flatten,1).indices
 
-            # loss calculation
-            # Cross Entropy
-    #         CE = cross_entropy(pred_flatten, groundtruth_index)
-
+            # Loss calculation
             # Add weight to NLL also
             NLL_loss, KL_loss, KL_weight = self.loss_fn(loss_function = loss_function, logp = logp_flatten, target = groundtruth_index, length = length, mean = mu, log_var = log_var,anneal_function='logistic', step=step, k=k, x0=x0)
-            loss = (NLL_loss + KL_weight * KL_loss) / self.val_size
+            loss = (NLL_loss + KL_weight * KL_loss)
             validation_loss += loss.item()
 
             print('validation_loss: ', validation_loss)
-            self.cal_reconstruction_rate(groundtruth_index.cpu(),pred_index.cpu())
+            acc = self.cal_reconstruction_rate(groundtruth_index.cpu(),pred_index.cpu())
+            
+            if acc > 0.8:
+                 # Save model
+                model_dir = 'output_models/' + self.save_model + '_acc_' + f'{acc:.4f}'.replace('.','')
+                torch.save(model.state_dict(), model_dir + '.pth')
+    
 
     ## Model training  
     def run(self):
@@ -203,16 +203,18 @@ class TrainingVAE():
 
         # Model
         print('building model...')
-        model = MusicVAE(Constants.TEACHER_FORCING, eps_i=0.6, device = self.device).to(self.device)
+        model = MusicVAE(Constants.TEACHER_FORCING, eps_i=self.teacher_forcing_rate, device = self.device).to(self.device)
         print(model)
 
         # Training parameters
         optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
         lambda1 = lambda epoch: 0.995 ** epoch
         scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda1)
-        loss_function = torch.nn.NLLLoss(reduction='sum')
-    #     cross_entropy = nn.CrossEntropyLoss(weight=weight_chord)
+        if self.weight:
+            self.weight = weight_chord
+        loss_function = torch.nn.NLLLoss(weight = self.weight)
 
+  
         # Define annealing parameters
         step = self.step
         k = self.k
@@ -252,12 +254,14 @@ def main():
 
     parser = argparse.ArgumentParser(description='Set configs to training process.') 
 
-    parser.add_argument('-learning_rate', type=float, default=0.005)   
+    parser.add_argument('-learning_rate', type=float, default=0.001)   
     parser.add_argument('-val_size', default=500)    
     parser.add_argument('-epoch', type=int, default=10)
     parser.add_argument('-batch_size', type=int, default=512)
     parser.add_argument('-save_model', type=str, required=True)
     parser.add_argument('-cuda', type=str, default='0')
+    parser.add_argument('-tfr', type=float, default=0.5)
+    parser.add_argument('-weight', type=str, default=None)
     
     args = parser.parse_args()
     

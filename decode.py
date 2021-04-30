@@ -6,6 +6,41 @@ import pypianoroll as pr
 from matplotlib import pyplot as plt
 import os 
 from constants import Constants
+from utils import INDICES_TO_PIANOROLL
+
+def argmax2pianoroll_all(joint_prob):
+    generate_pianoroll = []
+    for song in joint_prob:
+        pianoroll = []
+        for beat in song:
+            max_index = np.argmax(beat, axis=0)
+            pianoroll.append(INDICES_TO_PIANOROLL[max_index])
+        generate_pianoroll.append(pianoroll)
+
+    generate_pianoroll = np.asarray(generate_pianoroll)
+    print('generate_pianoroll shape', generate_pianoroll.shape)
+    return generate_pianoroll
+
+# augment chord into frame base
+def sequence2frame_all(generate_pianoroll, groundtruth_pianoroll):
+    print('augment chord into frame base...')
+    generate_pianoroll_frame = []
+    groundtruth_pianoroll_frame = []
+    for gen_song, truth_song in zip(generate_pianoroll, groundtruth_pianoroll):
+        gen_pianoroll = []
+        truth_pianoroll = []
+        for gen_beat, truth_beat in zip(gen_song, truth_song):
+            for i in range(Constants.BEAT_RESOLUTION * Constants.BEAT_PER_CHORD):
+                gen_pianoroll.append(gen_beat)
+                truth_pianoroll.append(truth_beat)
+        generate_pianoroll_frame.append(gen_pianoroll)
+        groundtruth_pianoroll_frame.append(truth_pianoroll)
+
+    generate_pianoroll_frame = np.asarray(generate_pianoroll_frame).astype(int)
+    groundtruth_pianoroll_frame = np.asarray(groundtruth_pianoroll_frame)
+    print('accompany_pianoroll frame shape:', generate_pianoroll_frame.shape)
+    print('groundtruth_pianoroll frame shape:', groundtruth_pianoroll_frame.shape)
+    return generate_pianoroll_frame, groundtruth_pianoroll_frame
 
 # Append argmax index to get pianoroll array
 #[batch, beats = 272, chordtypes = 96]
@@ -24,7 +59,7 @@ def argmax2pianoroll(joint_prob):
     return accompany_pianoroll
 
 # augment chord into frame base
-def sequence2frame(accompany_pianoroll, chord_groundtruth, BEAT_RESOLUTION=24, BEAT_PER_CHORD=2):
+def sequence2frame(accompany_pianoroll, chord_groundtruth):
     print('augment chord into frame base...')
     accompany_pianoroll_frame = []
     chord_groundtruth_frame = []
@@ -32,7 +67,7 @@ def sequence2frame(accompany_pianoroll, chord_groundtruth, BEAT_RESOLUTION=24, B
         acc_pianoroll = []
         truth_pianoroll = []
         for acc_beat, truth_beat in zip(acc_song, truth_song):
-            for i in range(BEAT_RESOLUTION*BEAT_PER_CHORD):
+            for i in range(Constants.BEAT_RESOLUTION * Constants.BEAT_PER_CHORD):
                 acc_pianoroll.append(acc_beat)
                 truth_pianoroll.append(truth_beat)
         accompany_pianoroll_frame.append(acc_pianoroll)
@@ -45,7 +80,7 @@ def sequence2frame(accompany_pianoroll, chord_groundtruth, BEAT_RESOLUTION=24, B
     return accompany_pianoroll_frame, chord_groundtruth_frame
 
 # write pianoroll
-def write_pianoroll(result_dir, melody_data, accompany_pianoroll_frame,chord_groundtruth_frame, length, tempos,downbeats, BEAT_RESOLUTION=Constants.BEAT_RESOLUTION, BEAT_PER_CHORD=Constants.BEAT_PER_CHORD):
+def write_pianoroll(result_dir, melody_data, accompany_pianoroll_frame,chord_groundtruth_frame, length, tempos,downbeats):
 
     print('write pianoroll...')
     if not os.path.exists(result_dir):
@@ -61,8 +96,8 @@ def write_pianoroll(result_dir, melody_data, accompany_pianoroll_frame,chord_gro
         track2 = Track(pianoroll=chord_roll)
         track3 = Track(pianoroll=truth_roll)
 
-        generate = Multitrack(tracks=[track1, track2], tempo=tempo, downbeat=downbeat, BEAT_RESOLUTION=BEAT_RESOLUTION)
-        truth = Multitrack(tracks=[track1, track3], tempo=tempo, downbeat=downbeat, BEAT_RESOLUTION=BEAT_RESOLUTION)
+        generate = Multitrack(tracks=[track1, track2], tempo=tempo, downbeat=downbeat, beat_resolution=Constants.BEAT_RESOLUTION)
+        truth = Multitrack(tracks=[track1, track3], tempo=tempo, downbeat=downbeat, beat_resolution=Constants.BEAT_RESOLUTION)
 
         pr.write(generate, result_dir + '/generate_' + str(counter) + '.mid')
         pr.write(truth, result_dir + '/groundtruth_' + str(counter) + '.mid')
@@ -80,7 +115,7 @@ def write_pianoroll(result_dir, melody_data, accompany_pianoroll_frame,chord_gro
     
 
 # write one pianoroll at once
-def write_one_pianoroll(result_dir, filename, melody_data, accompany_pianoroll_frame,chord_groundtruth_frame, length, tempo ,downbeat, BEAT_RESOLUTION=24, BEAT_PER_CHORD=2):
+def write_one_pianoroll(result_dir, filename, melody_data, accompany_pianoroll_frame,chord_groundtruth_frame, length, tempo ,downbeat):
 
     print('write pianoroll...')
     if not os.path.exists(result_dir):
@@ -94,8 +129,8 @@ def write_one_pianoroll(result_dir, filename, melody_data, accompany_pianoroll_f
     track2 = Track(pianoroll=chord_roll)
     track3 = Track(pianoroll=truth_roll)
 
-    generate = Multitrack(tracks=[track1, track2], tempo=tempo[0], downbeat=downbeat[0], BEAT_RESOLUTION=BEAT_RESOLUTION)
-    truth = Multitrack(tracks=[track1, track3], tempo=tempo[0], downbeat=downbeat[0], BEAT_RESOLUTION=BEAT_RESOLUTION)
+    generate = Multitrack(tracks=[track1, track2], tempo=tempo[0], downbeat=downbeat[0], beat_resolution=Constants.BEAT_RESOLUTION)
+    truth = Multitrack(tracks=[track1, track3], tempo=tempo[0], downbeat=downbeat[0], beat_resolution=Constants.BEAT_RESOLUTION)
 
     pr.write(generate, result_dir + '/generate-' + filename + '.mid')
     pr.write(truth, result_dir + '/groundtruth-' + filename + '.mid')

@@ -39,8 +39,8 @@ borrowed_onehot = []
 error = 0
 
 # Loss weighting array
-# weight_chord = [1000 for i in range(96)]
-weight_chord = [10000 for i in range(96)]
+weight_chord = [1000 for i in range(96)]
+# weight_chord = [10000 for i in range(96)]
 weight_roman = [0 for i in range(7)]
 weight_sec = [50000 for i in range(7)]
 weight_borrowed = [200000 for i in range(14)]

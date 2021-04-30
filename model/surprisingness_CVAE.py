@@ -26,7 +26,7 @@ class CVAE(nn.Module):
         self.latent_size = latent_size
         
         # Encoder
-        self.encoder = nn.LSTM(input_size=Constants_framewise.NUM_CHORDS, 
+        self.encoder = nn.LSTM(input_size=Constants.NUM_CHORDS, 
                                hidden_size = encoder_hidden_size , 
                                num_layers=encoder_num_layers,
                                batch_first=True, 
@@ -36,8 +36,11 @@ class CVAE(nn.Module):
         self.encoder_output2mean = nn.Linear(encoder_hidden_size * 2, latent_size)
         self.encoder_output2logv = nn.Linear(encoder_hidden_size * 2, latent_size)
         
+        # Surprisingness to prenet
+        self.surprisingness_prenet = nn.Linear(1, 256)
+        
         # Latent to decoder
-        self.latent2decoder_input = nn.Linear(latent_size + Constants.BEAT_RESOLUTION * 2 * 12, decoder_hidden_size // 2)
+        self.latent2decoder_input = nn.Linear(latent_size + Constants.BEAT_RESOLUTION * 2 * 12 + 256, decoder_hidden_size // 2)
         
         # Decoder
         self.decoder = nn.LSTM(input_size=decoder_hidden_size // 2, 
@@ -94,14 +97,15 @@ class CVAE(nn.Module):
         
         return result, softmax
     
-    def forward(self, input_chord, input_melody, length):
+    def forward(self, input_chord, input_melody, surprisingness, length):
         
         # Encode
         mu, log_var = self.encode(input_chord,length)
         
         # Reparameterize
         z = self.reparameterize(mu, log_var)
-        z = torch.cat([z,input_melody],dim=-1)
+        surprisingness = self.surprisingness_prenet(surprisingness)
+        z = torch.cat([z,input_melody,surprisingness],dim=-1)
         
         # Decode
         output, softmax = self.decode(z)

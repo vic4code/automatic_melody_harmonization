@@ -26,7 +26,7 @@ class CVAE(nn.Module):
         self.latent_size = latent_size
         
         # Encoder
-        self.encoder = nn.LSTM(input_size=Constants_framewise.NUM_CHORDS, 
+        self.encoder = nn.LSTM(input_size=Constants_framewise.ALL_NUM_CHORDS, 
                                hidden_size = encoder_hidden_size , 
                                num_layers=encoder_num_layers,
                                batch_first=True, 
@@ -48,7 +48,7 @@ class CVAE(nn.Module):
                                bidirectional=True)
         
         # Decoder to reconstructed chords
-        self.outputs2chord = nn.Linear(decoder_hidden_size * 2,Constants.NUM_CHORDS)
+        self.outputs2chord = nn.Linear(decoder_hidden_size * 2,Constants_framewise.ALL_NUM_CHORDS)
 
     def encode(self, input,length):
         

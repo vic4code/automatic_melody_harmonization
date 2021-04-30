@@ -132,7 +132,7 @@ for epoch in range(epochs):
         chord_mask, bin_chord_mask = random_choice()
         chord_mask, bin_chord_mask = torch.from_numpy(chord_mask).to(device), torch.from_numpy(bin_chord_mask).to(device)
         
-        # chord_onehot (512 (batch), 272, 96) -> (batch_size * 272, 1) for masking
+        # chord_onehot (512 (batch), 272, 96) -> (batch_size * 272, -1) for masking
         chord_onehot = torch.reshape(chord_onehot, (batch_size * 272, -1))
         
         # mask(add 96 blanks) chord by index

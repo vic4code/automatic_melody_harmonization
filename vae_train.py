@@ -21,6 +21,7 @@ class TrainingVAE():
         self.epoch = args.epoch
         self.learning_rate = args.learning_rate
         self.cuda = args.cuda
+        self.device = torch.device('cuda:' + self.cuda) if torch.cuda.is_available() else 'cpu'
         self.step = step
         self.k = k
         self.x0 = x0

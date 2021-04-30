@@ -33,6 +33,8 @@ def main():
         '--pitch_ratio', default=1, help='set pitch repeated pattern')
     parser.add_argument(
         '--rhythm_ratio', default=1, help='set rhythmic repeated pattern')
+    parser.add_argument(
+        '--dataset', default='test', help='Choosed data set')
     args = parser.parse_args()
     
     # Load data
@@ -40,33 +42,46 @@ def main():
     val_size = 500
 
     print('loading data...')
-    melody_data = np.load('./melody_data.npy')
-    chord_groundtruth = np.load('./chord_groundtruth.npy')
-    chord_onehot = np.load('./onehot_96.npy')
+    melody_data = np.load('./data/melody_data.npy')
+    chord_groundtruth = np.load('./data/chord_groundtruth.npy')
+    chord_onehot = np.load('./data/onehot_96.npy')
 
     # Reconstructed chords
     # chord_recon = np.load('./reconstructed_one_hot_chords.npy')
 
-    melody = np.load('./melody_baseline.npy')
-    lengths = np.load('./length.npy')
+    melody = np.load('./data/melody_baseline.npy')
+    lengths = np.load('./data/length.npy')
 
-    f = open('tempos', 'rb')
+    f = open('./data/tempos', 'rb')
     tempos = pickle.load(f)
     f.close()
-    f = open('downbeats', 'rb')
+    f = open('./data/downbeats', 'rb')
     downbeats = pickle.load(f)
     f.close()
 
-    print('splitting testing set...')
-    melody_data = melody_data[:val_size]
-    chord_groundtruth = chord_groundtruth[:val_size]
+    if args.dataset == 'train':
+        print('splitting training set...')
+        melody_data = melody_data[val_size:]
+        chord_groundtruth = chord_groundtruth[val_size:]
 
-    val_chord = torch.from_numpy(chord_onehot[:val_size]).float()
-    val_melody = torch.from_numpy(melody[:val_size]).float()
-    val_length = torch.from_numpy(lengths[:val_size])
+        val_chord = torch.from_numpy(chord_onehot[val_size:]).float()
+        val_melody = torch.from_numpy(melody[val_size:]).float()
+        val_length = torch.from_numpy(lengths[val_size:])
 
-    tempos = tempos[:val_size]
-    downbeats = downbeats[:val_size]
+        tempos = tempos[val_size:]
+        downbeats = downbeats[val_size:]
+
+    else:
+        print('splitting testing set...')
+        melody_data = melody_data[:val_size]
+        chord_groundtruth = chord_groundtruth[:val_size]
+
+        val_chord = torch.from_numpy(chord_onehot[:val_size]).float()
+        val_melody = torch.from_numpy(melody[:val_size]).float()
+        val_length = torch.from_numpy(lengths[:val_size])
+
+        tempos = tempos[:val_size]
+        downbeats = downbeats[:val_size]
 
     # Load model
     print('building model...')
@@ -81,7 +96,7 @@ def main():
     pianoroll_frames = 12 * 24 * 2
     
     np.random.seed(args.seed)
-    indices = np.random.randint(500, size=args.sample_num)
+    indices = np.random.randint(melody_data.shape[0], size=args.sample_num)
     print(indices)
     
     for index in indices:
@@ -122,18 +137,16 @@ def main():
         accompany_pianoroll = argmax2pianoroll(joint_prob)
 
         # augment chord into frame base
-        BEAT_RESOLUTION = 24
-        BEAT_PER_CHORD = 2
 
-        accompany_pianoroll_frame, chord_groundtruth_frame = sequence2frame(accompany_pianoroll, chord_truth, BEAT_RESOLUTION=BEAT_RESOLUTION, BEAT_PER_CHORD=BEAT_PER_CHORD)
+        accompany_pianoroll_frame, chord_groundtruth_frame = sequence2frame(accompany_pianoroll, chord_truth)
 
         # length into frame base
-        decode_length = decode_length * BEAT_RESOLUTION * BEAT_PER_CHORD
+        decode_length = decode_length * Constants.BEAT_RESOLUTION * Constants.BEAT_PER_CHORD
 
         # write pianoroll
         result_dir = 'results/' + args.outputdir
 #         filename = str(index) + '-pitch-' + str(args.pitch_ratio) + '-rhythm-' + str(args.rhythm_ratio)
-        filename = str(index) + '-pitch-' + str(args.pitch_ratio)
+        filename = args.dataset + '_' + str(index) + '-pitch-' + str(args.pitch_ratio)
         print(result_dir)
         print(result_dir + '/' + filename + '.mid')
         write_one_pianoroll(result_dir, filename ,melody_truth, accompany_pianoroll_frame,chord_groundtruth_frame, decode_length, tempo,downbeat)

@@ -6,7 +6,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.autograd import Variable
 from constants import Constants, Constants_framewise
 
-class CVAE(nn.Module):
+class VAE(nn.Module):
     def __init__(self,
                  encoder_hidden_size = Constants_framewise.ENCODER_HIDDEN_SIZE, 
                  decoder_hidden_size = Constants_framewise.DECODER_HIDDEN_SIZE,
@@ -15,7 +15,7 @@ class CVAE(nn.Module):
                  decoder_num_layers = Constants_framewise.DECODER_NUM_LAYER, 
                  batch_size = 512, 
                  device = 'cpu' ):
-        super(CVAE, self).__init__()
+        super(VAE, self).__init__()
         
         self.device = device
         self.latent_size = latent_size
@@ -26,7 +26,7 @@ class CVAE(nn.Module):
         self.latent_size = latent_size
         
         # Encoder
-        self.encoder = nn.LSTM(input_size=Constants_framewise.NUM_CHORDS, 
+        self.encoder = nn.LSTM(input_size=Constants_framewise.ALL_NUM_CHORDS, 
                                hidden_size = encoder_hidden_size , 
                                num_layers=encoder_num_layers,
                                batch_first=True, 
@@ -37,7 +37,7 @@ class CVAE(nn.Module):
         self.encoder_output2logv = nn.Linear(encoder_hidden_size * 2, latent_size)
         
         # Latent to decoder
-        self.latent2decoder_input = nn.Linear(latent_size + Constants.BEAT_RESOLUTION * 2 * 12, decoder_hidden_size // 2)
+        self.latent2decoder_input = nn.Linear(latent_size, decoder_hidden_size // 2)
         
         # Decoder
         self.decoder = nn.LSTM(input_size=decoder_hidden_size // 2, 
@@ -48,7 +48,7 @@ class CVAE(nn.Module):
                                bidirectional=True)
         
         # Decoder to reconstructed chords
-        self.outputs2chord = nn.Linear(decoder_hidden_size * 2,Constants.NUM_CHORDS)
+        self.outputs2chord = nn.Linear(decoder_hidden_size * 2,Constants_framewise.ALL_NUM_CHORDS)
 
     def encode(self, input,length):
         
@@ -94,14 +94,14 @@ class CVAE(nn.Module):
         
         return result, softmax
     
-    def forward(self, input_chord, input_melody, length):
+    def forward(self, input_chord, length):
         
         # Encode
         mu, log_var = self.encode(input_chord,length)
         
         # Reparameterize
         z = self.reparameterize(mu, log_var)
-        z = torch.cat([z,input_melody],dim=-1)
+#         z = torch.cat([z,input_melody],dim=-1)
         
         # Decode
         output, softmax = self.decode(z)

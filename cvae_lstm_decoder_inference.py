@@ -6,9 +6,8 @@ import pickle
 from decode import *
 from model.CVAE_lstm_decoder import CVAE
 from metrics import CHE_and_CC, CTD, CTnCTR, PCS, MCTD
-from constants import Constants, Constants_framewise
+from constants import Constants
 from sklearn.metrics import accuracy_score
-
 
 class InferenceVAE():
     def __init__(self,args):
@@ -16,6 +15,7 @@ class InferenceVAE():
         self.seed = args.seed
         self.cuda = args.cuda
         self.device = torch.device('cuda:' + self.cuda) if torch.cuda.is_available() else 'cpu'
+        self.latent_size = args.latent_size
         self.max_seq_len = Constants.MAX_SEQUENCE_LENGTH
         self.model_path = args.model_path
         self.inference_size = args.inference_size
@@ -39,6 +39,8 @@ class InferenceVAE():
 
         melody_data = np.load('./data/melody_data.npy')
         chord_groundtruth = np.load('./data/chord_groundtruth.npy')
+        chord_onehot = np.load('./data/onehot_96.npy')
+
         melody_condition = np.load('./data/melody_baseline.npy')
         lengths = np.load('./data/length.npy')
 
@@ -52,13 +54,15 @@ class InferenceVAE():
         print('splitting testing set...')
         melody_data = melody_data[:self.inference_size]
         chord_groundtruth = chord_groundtruth[:self.inference_size]
+
+        val_chord = torch.from_numpy(chord_onehot[:self.inference_size]).float()
         val_melody_condition = torch.from_numpy(melody_condition[:self.inference_size]).float()
         val_length = torch.from_numpy(lengths[:self.inference_size])
 
         tempos = tempos[:self.inference_size]
         downbeats = downbeats[:self.inference_size]
         
-        return melody_data, val_melody_condition, chord_groundtruth, val_length, tempos, downbeats
+        return melody_data, val_melody_condition, chord_groundtruth, val_chord, val_length, tempos, downbeats
         
     ## Calculate objective metrics
     def cal_objective_metrics(self,melody,chord_pred,length):
@@ -125,7 +129,7 @@ class InferenceVAE():
 
             # Sampling
             torch.manual_seed(self.seed)
-            latent = torch.randn(1,Constants_framewise.LATENT_SIZE).to(self.device)
+            latent = torch.randn(1,self.latent_size).to(self.device)
 
     #         z = torch.cat((latent,melody1,r_pitch,r_rhythm), dim=-1)
             z = torch.cat((latent,melody), dim=-1)
@@ -157,7 +161,7 @@ class InferenceVAE():
         
     def sample_from_latent(self, model, input_melody):
         # Sampling
-        latent = torch.randn(self.inference_size,Constants.MAX_SEQUENCE_LENGTH,Constants_framewise.LATENT_SIZE).to(self.device)
+        latent = torch.randn(self.inference_size,Constants.MAX_SEQUENCE_LENGTH,self.latent_size).to(self.device)
         z = torch.cat((latent,input_melody), dim=-1)
         _,samples = model.decode(z)
         
@@ -178,8 +182,8 @@ class InferenceVAE():
     ## Model inference
     def run(self):
         
-        melody_data, val_melody_condition, chord_groundtruth, val_length, tempos, downbeats = self.load_data()
-        val_melody_condition, val_length = val_melody_condition.to(self.device), val_length.to(self.device).squeeze()
+        melody_data, val_melody_condition, chord_groundtruth, val_chord, val_length, tempos, downbeats = self.load_data()
+        val_melody_condition, val_chord, val_length = val_melody_condition.to(self.device), val_chord.to(self.device), val_length.to(self.device).squeeze()
         val_length = val_length.cpu().detach().numpy()
         
         model = self.load_model(self.model_path)
@@ -221,6 +225,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Set configs to training process.') 
     
+    parser.add_argument('-latent_size', type=int, default=16) 
     parser.add_argument('-inference_size', type=int, default=500) 
     parser.add_argument('-model_path', type=str, required=True)
     parser.add_argument('-outputdir', type=str, default='new_results')

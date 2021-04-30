@@ -36,10 +36,6 @@ def CTD(chord_sequence, chord_num = 96):
     if chord_num == 96:
         for i in chord_index:
             chord_note.append(note2number(chord962note(i)))
-    else:
-        for i in chord_index:
-            chord_note.append(note2number(chord482note(i)))
-
     y = 0
 
     for n in range(len(chord_note) - 1):
